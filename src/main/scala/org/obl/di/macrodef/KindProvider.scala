@@ -9,11 +9,17 @@ private[di] object Kind {
 }
 
 private[di] sealed trait Id
+
 private[di] case object Global extends Id
+
 private[di] case class WithName(name: String) extends Id
 
+private[di] case class WithQualifier(qualifierName: String, values: Map[String, Any]) extends Id
+
 private[di] sealed trait DagScope
+
 private[di] case object DefaultScope extends DagScope
+
 private[di] case object SingletonScope extends DagScope
 
 private[di] trait KindProvider[C <: Context] {
@@ -37,23 +43,45 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
 
   private lazy val javaxInjectNamed = typeOf[javax.inject.Named]
   private lazy val javaxInjectSingleton = typeOf[javax.inject.Singleton]
+  private lazy val javaxInjectQualifier = typeOf[javax.inject.Qualifier]
 
   private def annotationStringAttribute(annotation: Annotation, attr: String): Option[String] = {
     annotation.tree.children.tail.collectFirst {
-      case arg @ AssignOrNamedArg(id: Ident, Literal(Constant(v: String))) if id.name.decodedName.toString == attr =>
+      case arg@AssignOrNamedArg(id: Ident, Literal(Constant(v: String))) if id.name.decodedName.toString == attr =>
         v
     }
   }
 
+  private def isAnnotated(annotation: Annotation, typeOfAnnotation: Type) = {
+    annotation.tree.tpe.typeSymbol.annotations.exists(ann => ann.tree.tpe =:= typeOfAnnotation)
+  }
+
   private def annotationIds(annotations: List[Annotation]): Set[Id] = {
     val r = annotations.toSet.flatMap { annotation: Annotation =>
-      if (annotation.tree.tpe <:< javaxInjectNamed) {
+      if (annotation.tree.tpe =:= javaxInjectNamed) {
         val annName = annotationStringAttribute(annotation, "value").getOrElse {
           context.abort(context.enclosingPosition, "value attribute is mandatory for javax.injectNamed")
         }
         Set[Id](WithName(annName))
-      } else
+      } else if (isAnnotated(annotation, javaxInjectQualifier)) {
+        annotation.tree.children match {
+          case Nil => throw new RuntimeException("annotation macro erro")
+          case Select(_, name) :: rest =>
+            val parsMap = rest.collect {
+              case arg@AssignOrNamedArg(id: Ident, Literal(Constant(v))) =>
+                id.name.decodedName.toString -> v
+            }
+            Set[Id](WithQualifier(name.decodedName.toString, parsMap.toMap))
+        }
+      } else {
+//        val itemType = typeOf[org.obl.di.Item[_]]
+////        context.warning(annotation.tree.pos, "annotation  =" + annotation.tree.children.mkString(" -- "))
+//        if (annotation.tree.tpe <:< itemType){
+//          context.warning(annotation.tree.pos, "annotation  =" + annotation.tree.tpe.typeArgs.mkString(", "))
+//        }
+
         Set.empty[Id]
+      }
     }
     if (r.nonEmpty) r else Set(Global)
   }
@@ -73,7 +101,7 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
 
   def apply(sym: context.Symbol): Kind = {
     Option(sym).map { sym =>
-      
+
       val annotations = if (sym.isMethod) {
         val mthd = sym.asMethod
         (if (mthd.isAccessor) mthd.accessed.annotations else Nil) ++ mthd.annotations
@@ -81,7 +109,8 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
         sym.annotations
       } else
         Nil
-        
+
+
       Kind(annotationIds(annotations), annotationScope(annotations).getOrElse(DefaultScope))
 
     } getOrElse {

@@ -10,7 +10,7 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
   def toDagNodesWithRefs(valueExpr: context.Expr[_], kindProvider: Symbol => Kind): Map[(Id, Symbol), Dag[DagNodeOrRef]] = {
     val exprTyp = valueExpr.actualType
     val exprNm = TermName(context.freshName(exprTyp.typeSymbol.name.decodedName.toString))
-    val exprDag = alias(exprNm, valueExpr.tree, kindProvider)
+    val exprDag = alias(exprNm, valueExpr.tree, kindProvider(valueExpr.tree.symbol))
     val dags = exprDag +: membersSelect.bindings(exprTyp).map { member =>
       methodDag(exprDag, exprNm, member, kindProvider)
     }

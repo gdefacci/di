@@ -6,15 +6,15 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
 
   import context.universe._
 
-  def alias[N >: ValueDagNode <: DagNodeOrRef](exprNm:TermName, valueExpr: Tree, kindProvider: Symbol => Kind):Dag[N] = {
+  def alias[N >: ValueDagNode <: DagNodeOrRef](exprNm:TermName, valueExpr: Tree, kind:Kind):Dag[N] = {
     val vexpr = q"""
     val $exprNm = $valueExpr
     """
-    Leaf[N](new ValueDagNode(kindProvider(vexpr.symbol), vexpr :: Nil, q"$exprNm", valueExpr.tpe, valueExpr.pos))
+    Leaf[N](new ValueDagNode(kind, vexpr :: Nil, q"$exprNm", valueExpr.tpe, valueExpr.pos))
   }
 
-  def valueDag[N >: ValueDagNode <: DagNodeOrRef](initialization:Seq[Tree], v:Tree, kindProvider: Symbol => Kind):Dag[N] =
-    Leaf(new ValueDagNode(kindProvider(v.symbol), initialization, v,  v.tpe, v.pos))
+  def valueDag[N >: ValueDagNode <: DagNodeOrRef](initialization:Seq[Tree], v:Tree, kind:Kind):Dag[N] =
+    Leaf(new ValueDagNode(kind, initialization, v,  v.tpe, v.pos))
 
   def methodDag(container: Dag[DagNodeOrRef],
                 containerTermName: TermName,
@@ -38,9 +38,9 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
   }
   
   def constructorDag(constructorMethod:MethodSymbol,
-                           mappings: Map[(Id, Symbol), Dag[DagNodeOrRef]],
-                           kindProvider: Symbol => Kind,
-                           members:Seq[Tree]): Dag[DagNodeOrRef] = {
+                     mappings: Map[(Id, Symbol), Dag[DagNodeOrRef]],
+                     kindProvider: Symbol => Kind,
+                     members:Seq[Tree]): Dag[DagNodeOrRef] = {
     val typ = constructorMethod.owner
     if (!typ.isClass) {
       context.abort(context.enclosingPosition, typ.toString())

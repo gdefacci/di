@@ -48,7 +48,8 @@ private[di] trait DagNodeFactory[C <: Context] { self:DagNodes[C] with DagNodeOr
   def checkIsNotPrimitive(kind:Kind, typ:Type) = {
     if (membersSelect.isPrimitive(typ)) {
     	  context.abort(context.enclosingPosition, s"could not find a binding for ${typ} with id ${kind.ids.mkString(",")}")
-    	}  }
+    	}
+  }
 
   private def refToDagNode(ref: Ref,
                            mappings: Map[(Id, Symbol), Dag[DagNodeOrRef]],
@@ -74,7 +75,7 @@ private[di] trait DagNodeFactory[C <: Context] { self:DagNodes[C] with DagNodeOr
             dagNodeOrRefToDagNode(hd._2, mappings, kindProvider)
 
           case ambRefs =>
-            context.abort(ref.sourcePos, s"more than 1 instance avaiable for ${ref.kind} ${ref.typ} ${ambRefs.map(_._1._2).mkString(", ")}")
+            context.abort(ref.sourcePos, s"more than 1 instance available for ${ref.kind} ${ref.typ} ${ambRefs.map(_._1._2).mkString(", ")}")
         }
     }
   }
@@ -103,7 +104,7 @@ private[di] trait DagNodeFactory[C <: Context] { self:DagNodes[C] with DagNodeOr
     val members = membersDagInfo.map(_.toTree)
 
     primaryConstructor.fold(
-      valueDag[DagNode](Nil, reflectUtils.newTrait(typ.typeSymbol, members), kindProvider)
+      valueDag[DagNode](Nil, reflectUtils.newTrait(typ.typeSymbol, members), Kind.default)
     )( constr =>
       dagNodeOrRefToDagNode(constructorDag(constr, mappings, kindProvider, members), mappings, kindProvider)
     )

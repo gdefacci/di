@@ -5,7 +5,7 @@ object TwitterDiSample extends App {
 
   val src = IOC.getSource[ApplicationComponentsProvider]()
   val app = IOC.get[ApplicationComponentsProvider]()
-  val app1 = IOC.getSource[ApplicationComponent]("bòah")
+  val app1 = IOC.getSource[ApplicationComponent]("user")
 
   println(src)
   println(app1)

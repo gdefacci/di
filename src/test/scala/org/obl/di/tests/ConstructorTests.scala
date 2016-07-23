@@ -114,6 +114,14 @@ class ConstructorTests extends FunSuite{
     assert( service.repo1 == new TestRepo(false) )
     assert( service.repo2 == new TestRepo(true) )
   }
+
+  test("qualifier ") {
+    import samples2._
+
+    val service = IOC.get[ServiceDRepo](samples2.module5Qualifier)
+    assert( service.repo1 == new TestRepo(false) )
+    assert( service.repo2 == new TestRepo(true) )
+  }
   
   test("named bind") {
     import samples2._
@@ -123,4 +131,11 @@ class ConstructorTests extends FunSuite{
     assert( service.repo2 == new TestRepo(false) )
   }
 
+  test("qualifier bind") {
+    import samples2._
+
+    val service = IOC.get[ServiceDRepo](samples2.module5BindQualifier)
+    assert( service.repo1 == new TestRepo(true) )
+    assert( service.repo2 == new TestRepo(false) )
+  }
 }

@@ -25,13 +25,13 @@ private[di] class ReflectUtils[C <: Context](val context: C) {
           case _ +: tail => tail.toList
       })
     }
-    val pars = Utils.byLenghtsPartition(method.paramLists.map(_.length), args1)
+    val pars = Utils.byLengthsPartition(method.paramLists.map(_.length), args1)
     applyParameters(exprValue, pars)
   }
 
   def newAbstractClass(typ:Symbol, paramss: List[List[Symbol]], arguments:Seq[Tree], members:Seq[Tree]):Tree = {
     val typName = TypeName(context.freshName(typ.name.decodedName.toString))
-    val pars = Utils.byLenghtsPartition(paramss.map(_.length), arguments.toList)
+    val pars = Utils.byLengthsPartition(paramss.map(_.length), arguments.toList)
     q"""
     class $typName extends $typ(...$pars) {
       ..$members

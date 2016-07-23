@@ -53,6 +53,7 @@ object TwitterModule {
 
 case class UserModule(user:User)
 
+/*
 object Sample {
   
   def di[I](impls:AnyRef*):I = ???
@@ -81,10 +82,9 @@ object Sample {
     }
   }
 
-  
-  
-  
+
 }
+*/
 
 
 

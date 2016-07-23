@@ -2,7 +2,7 @@ package org.obl.di.tests
 
 import javax.inject.Named
 
-import org.obl.di.Bind
+import org.obl.di.{Bind}
 import scala.annotation.StaticAnnotation
 import javax.inject.Qualifier
 import scala.annotation.ClassfileAnnotation
@@ -92,4 +92,27 @@ object samples2 {
     
     @Named("repo2") val myboolRepo2 = false
   }
+
+  object module5Qualifier {
+
+    def create(@Qual1(value = 1, name = "aaa") r1:Repository, r2:Repository) = ServiceDRepo(r1,r2)
+
+    @Qual1(value = 1, name = "aaa") val repo1 = new TestRepo(false)
+    val repo2 = new TestRepo(true)
+
+  }
+
+  object module5BindQualifier {
+
+    def create(@Qual1(value = 1, name = "aaa") r1:Repository, r2:Repository) = ServiceDRepo(r1,r2)
+
+    @Qual1(value = 1, name = "aaa") val bindRepo = Bind[Repository, TestRepo]
+
+    val mybool = true
+
+    def repo2(@Qual1(value = 2, name = "aaa") b2:Boolean) = new TestRepo(b2)
+
+    @Qual1(value = 2, name = "aaa") val myboolRepo2 = false
+  }
+
 }
