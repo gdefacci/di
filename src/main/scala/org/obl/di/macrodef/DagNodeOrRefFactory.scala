@@ -25,7 +25,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
       Leaf[DagNodeOrRef](new Ref(kindProvider(par), par.info, par.pos))
     ))
     assert(paramLists.map(_.length).sum == parametersDags.length)
-    Node[DagNodeOrRef](new MethodDagNode(kindProvider(method), Some(containerTermName), method, Nil), container +: parametersDags.toSeq)
+    Node[DagNodeOrRef](new MethodDagNode(kindProvider(method), Some(containerTermName), method), container +: parametersDags.toSeq)
   }
   
   def firstMapping[T](ids:Set[Id], typeSymbol:Symbol, mappings:Map[(Id, Symbol), T]):Option[(Id,T)] = {
@@ -54,7 +54,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
       }).toSeq
     val knd = kindProvider(constructorMethod)
     assert(parametersDags.length == constructorMethod.paramLists.map(_.length).sum)
-    Node[DagNodeOrRef](new ConstructorDagNode(knd, None, constructorMethod, members, Nil), parametersDags)
+    Node[DagNodeOrRef](new ConstructorDagNode(knd, None, constructorMethod, members), parametersDags)
   }
 
   def parameterDag(par:Symbol, knd:Kind) =

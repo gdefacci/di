@@ -8,16 +8,20 @@ private[di] trait DagNodes[C <: Context] {
   import context.universe._
 
   lazy val reflectUtils = new ReflectUtils[context.type](context)
+  
+  object IdGen {
+    private val counter = new java.util.concurrent.atomic.AtomicInteger(0)
+    def next = counter.incrementAndGet
+  }
 
   sealed trait DagNodeOrRef {
     val kind: Kind
     def typ: Type
     def sourcePos: Position
     def description: String
-    val initialization: Seq[Tree]
   }
 
-  sealed trait DagNode extends DagNodeOrRef
+  sealed abstract case class DagNode(id:Int) extends DagNodeOrRef
 
   sealed trait MethodNode extends DagNode {
     def invoke(inputs:Seq[Tree]):Tree
@@ -25,10 +29,11 @@ private[di] trait DagNodes[C <: Context] {
 
   sealed trait ValueNode extends DagNode {
     val value: Tree
+    def initialization:Seq[Tree]
 //    def sourceTree: Tree
   }
 
-  case class MethodDagNode(val kind: Kind, val containerTermName: Option[TermName], val method: Symbol, initialization: Seq[Tree]) extends MethodNode {
+  final class MethodDagNode(val kind: Kind, val containerTermName: Option[TermName], val method: Symbol, id:Int = IdGen.next) extends DagNode(id) with MethodNode {
     val methodSymbol = method.asMethod
     val typ = methodSymbol.returnType
     val sourcePos: Position = method.pos
@@ -39,7 +44,8 @@ private[di] trait DagNodes[C <: Context] {
       reflectUtils.methodCall(containerTermName, methodSymbol, inputs)
   }
 
-  case class ConstructorDagNode(val kind: Kind, val containerTermName: Option[TermName], val method: MethodSymbol, members:Seq[Tree], initialization: Seq[Tree]) extends MethodNode {
+  final class ConstructorDagNode(val kind: Kind, val containerTermName: Option[TermName], val method: MethodSymbol, 
+                                 val members:Seq[Tree], id:Int = IdGen.next) extends DagNode(id) with MethodNode {
     val typ = method.returnType
     val sourcePos: Position = method.pos
 
@@ -50,12 +56,13 @@ private[di] trait DagNodes[C <: Context] {
       else reflectUtils.newAbstractClass(method.owner, method.paramLists, inputs, members)
   }
 
-  case class ValueDagNode(kind: Kind, initialization: Seq[Tree], value: Tree, typ: Type, sourcePos:Position) extends ValueNode {
+  final class ValueDagNode(val kind: Kind, val initialization: Seq[Tree], val value: Tree, val typ: Type, 
+                           val sourcePos:Position, id:Int = IdGen.next) extends DagNode(id) with ValueNode {
 //    lazy val sourcePos: Position = sourceTree.pos
     def description: String = s"$value"
   }
 
-  case class ParameterDagNode(val kind: Kind, val value: Tree, val typ: Type, val sourceTree: Tree) extends ValueNode {
+  final class ParameterDagNode(val kind: Kind, val value: Tree, val typ: Type, val sourceTree: Tree, id:Int = IdGen.next) extends DagNode(id) with ValueNode {
     val initialization: Seq[Tree] = Nil
     lazy val sourcePos: Position = sourceTree.pos
     def description: String = s"$sourceTree"
