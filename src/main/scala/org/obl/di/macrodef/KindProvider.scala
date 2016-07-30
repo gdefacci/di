@@ -2,10 +2,16 @@ package org.obl.di.macrodef
 
 import scala.reflect.macros.blackbox.Context
 
-private[di] case class Kind(ids: Set[Id], scope: DagScope)
+private[di] case class Kind(id: Id, scope: DagScope)
+
+private[di] case class Kinds(ids: Set[Id], scope: DagScope)
+
+object Kinds {
+  def default = Kinds(Set(Kind.default.id), Kind.default.scope)
+}
 
 private[di] object Kind {
-  def default = Kind(Set(Global), DefaultScope)
+  def default = Kind(Global, DefaultScope)
 }
 
 private[di] sealed trait Id
@@ -27,7 +33,7 @@ private[di] trait KindProvider[C <: Context] {
 
   import context.universe._
 
-  def apply(sym: context.Symbol): Kind
+  def apply(sym: context.Symbol): Kinds
 
 }
 
@@ -52,18 +58,19 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
     }
   }
 
-  private def isAnnotated(annotation: Annotation, typeOfAnnotation: Type) = {
-    annotation.tree.tpe.typeSymbol.annotations.exists(ann => ann.tree.tpe =:= typeOfAnnotation)
+  private def isAnnotated(annotationTpe: Type, typeOfAnnotation: Type) = {
+    annotationTpe.typeSymbol.annotations.exists(ann => ann.tree.tpe =:= typeOfAnnotation)
   }
 
   private def annotationIds(annotations: List[Annotation]): Set[Id] = {
     val r = annotations.toSet.flatMap { annotation: Annotation =>
-      if (annotation.tree.tpe =:= javaxInjectNamed) {
+      val annotationTpe: Type = annotation.tree.tpe 
+      if (annotationTpe =:= javaxInjectNamed) {
         val annName = annotationStringAttribute(annotation, "value").getOrElse {
           context.abort(context.enclosingPosition, "value attribute is mandatory for javax.injectNamed")
         }
         Set[Id](WithName(annName))
-      } else if (isAnnotated(annotation, javaxInjectQualifier)) {
+      } else if (isAnnotated(annotationTpe, javaxInjectQualifier)) {
         annotation.tree.children match {
           case Nil => throw new RuntimeException("annotation macro erro")
           case Select(_, name) :: rest =>
@@ -88,7 +95,8 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
 
   private def annotationScope(annotations: List[Annotation]): Option[DagScope] = {
     annotations.flatMap { annotation: Annotation =>
-      if (annotation.tree.tpe <:< javaxInjectSingleton) {
+      if (annotation.tree.tpe =:= javaxInjectSingleton) {
+        //context.warning(annotation.tree.pos, "SingletonScope --")
         Seq[DagScope](SingletonScope)
       } else
         Seq.empty[DagScope]
@@ -99,7 +107,7 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
     }
   }
 
-  def apply(sym: context.Symbol): Kind = {
+  def apply(sym: context.Symbol): Kinds = {
     Option(sym).map { sym =>
 
       val annotations = if (sym.isMethod) {
@@ -111,10 +119,10 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
         Nil
 
 
-      Kind(annotationIds(annotations), annotationScope(annotations).getOrElse(DefaultScope))
+      Kinds(annotationIds(annotations), annotationScope(annotations).getOrElse(DefaultScope))
 
     } getOrElse {
-      Kind.default
+      Kinds.default
     }
   }
 

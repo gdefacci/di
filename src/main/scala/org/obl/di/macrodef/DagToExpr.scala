@@ -17,59 +17,15 @@ private[di] trait DagToExpr[C <: Context] { self:DagNodes[C] =>
   }
   
   def dagToExpr[T](dag: Dag[DagNode]): DagExprs = {
-    val nds = dag.visit.collect {
-      case vn:ValueNode => vn.initialization
-      case mn:MethodNode => Nil
-    }.flatten
-    val ndv = dag match {
-      case Leaf(vn:ValueNode) =>
-        vn.value
-      case Leaf(mn:MethodNode) =>
-        mn.invoke(Nil)
-      case dn @ Node(n, inputs) =>
-        val vs: Seq[DagExprs] = inputs.map(dn => dagToExpr(dn))
-        val args = vs.map(_.value)
+    val nds:Seq[DagExprs] = Dag.visit(dag).collect {
+      case n => 
+        val vs: Seq[DagExprs] = n.inputs.map(dn => dagToExpr(dn))
+        val inits = n.value.initialization
         
-        n match {
-          case vn:ValueNode => vn.value
-          case mn:MethodNode => mn.invoke(args)
-        }
+        val args = vs.map(_.value)
+        DagExprs(inits(args), n.value.invoke(args))
     }
-    DagExprs(nds, ndv)
+    DagExprs(nds.flatMap(_.initialization), nds.last.value)
   }
-  
-//  import collection.mutable.{Map => MMap}
-//  
-//  def dagToExpr1[T](dag: Dag[DagNode], mp:MMap[(Id, Type), DagExprs]): DagExprs = {
-//    val dagValue = dag.value
-//    val dagTyp = dagValue.typ
-//    dagValue.kind.ids.collectFirst {
-//      case id if mp.contains(id -> dagTyp) => id -> mp(id -> dagTyp)
-//    } match {
-//      case Some((id, dgExpr)) => 
-//        assert( dagValue.kind.ids.forall(id => mp.contains(id -> dagTyp)), s"at this point map shuld contains all the ids for $dagTyp" )
-//        dgExpr
-//      case None =>
-//        assert( dagValue.kind.ids.forall(id => !mp.contains(id -> dagTyp)), s"at this point map shuld none of the the ids for $dagTyp" )
-//        
-//        val z:(Seq[Tree], Seq[Tree]) = Nil -> Nil
-//        dag.inputs.foldLeft(z) { (acc, inpDag) =>
-//          val (inits, values) = acc
-//          mp.get(inp)
-//          ???
-//        }
-//        dag.inputs.foreach(dagToExpr1(_, mp))        
-//
-//        dagValue match {
-//          case vn:ValueNode => vn.value
-//          case mn:MethodNode => mn.invoke(args)
-//        }
-//    }
-//    
-//    dagValue.kind.ids.forall( id => mp.contains(id -> dagTyp))
-//    
-//    ???
-//  }
-  
   
 }

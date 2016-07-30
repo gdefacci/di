@@ -37,6 +37,8 @@ trait ApplicationComponent {
   def getTimeline():Timeline 
 }
 
+case class ApplicationComponentImpl(getTweeter:Tweeter, getTimeline:Timeline) 
+
 trait ApplicationComponentsProvider {
   def getTweeter(user:User):Tweeter
   def getTimeline(user:User):Timeline
@@ -48,7 +50,7 @@ object NetworkModule {
 
 object TwitterModule {
   @Singleton
-  def createTweeterApi = TwitterApi(_,_)
+  def createTweeterApi(user: User, httpClient: OkHttpClient) = TwitterApi(user, httpClient)
 }
 
 case class UserModule(user:User)

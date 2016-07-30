@@ -3,74 +3,80 @@ package org.obl.di.macrodef
 import scala.reflect.macros.blackbox.Context
 
 private[di] trait DagNodes[C <: Context] {
-  val context:C
+  val context: C
 
   import context.universe._
 
   lazy val reflectUtils = new ReflectUtils[context.type](context)
-  
+
   object IdGen {
     private val counter = new java.util.concurrent.atomic.AtomicInteger(0)
     def next = counter.incrementAndGet
   }
 
   sealed trait DagNodeOrRef {
-    val kind: Kind
     def typ: Type
     def sourcePos: Position
-    def description: String
+
   }
 
-  sealed abstract case class DagNode(id:Int) extends DagNodeOrRef
-
-  sealed trait MethodNode extends DagNode {
-    def invoke(inputs:Seq[Tree]):Tree
-  }
-
-  sealed trait ValueNode extends DagNode {
-    val value: Tree
-    def initialization:Seq[Tree]
-//    def sourceTree: Tree
-  }
-
-  final class MethodDagNode(val kind: Kind, val containerTermName: Option[TermName], val method: Symbol, id:Int = IdGen.next) extends DagNode(id) with MethodNode {
-    val methodSymbol = method.asMethod
-    val typ = methodSymbol.returnType
-    val sourcePos: Position = method.pos
-
-    def description: String = s"$method"
-
-    def invoke(inputs:Seq[Tree]):Tree =
-      reflectUtils.methodCall(containerTermName, methodSymbol, inputs)
-  }
-
-  final class ConstructorDagNode(val kind: Kind, val containerTermName: Option[TermName], val method: MethodSymbol, 
-                                 val members:Seq[Tree], id:Int = IdGen.next) extends DagNode(id) with MethodNode {
-    val typ = method.returnType
-    val sourcePos: Position = method.pos
-
-    def description: String = s"$method"
-
-    def invoke(inputs:Seq[Tree]):Tree =
-      if (members.isEmpty) reflectUtils.methodCall(containerTermName, method, inputs)
-      else reflectUtils.newAbstractClass(method.owner, method.paramLists, inputs, members)
-  }
-
-  final class ValueDagNode(val kind: Kind, val initialization: Seq[Tree], val value: Tree, val typ: Type, 
-                           val sourcePos:Position, id:Int = IdGen.next) extends DagNode(id) with ValueNode {
-//    lazy val sourcePos: Position = sourceTree.pos
-    def description: String = s"$value"
-  }
-
-  final class ParameterDagNode(val kind: Kind, val value: Tree, val typ: Type, val sourceTree: Tree, id:Int = IdGen.next) extends DagNode(id) with ValueNode {
-    val initialization: Seq[Tree] = Nil
-    lazy val sourcePos: Position = sourceTree.pos
-    def description: String = s"$sourceTree"
-  }
-
-  case class Ref(val kind: Kind, val typ: Type, val sourcePos: Position) extends DagNodeOrRef {
+  sealed case class Ref(val kinds: Kinds, val typ: Type, val sourcePos: Position) extends DagNodeOrRef {
+    assert(typ != null)
     def description: String = s"Reference to type $typ"
-    val initialization: Seq[Tree] = Nil
+  }
+  
+  sealed abstract case class DagNode(id: Int) extends DagNodeOrRef {
+    val kind: Kind
+    def description: String
+    def singletonName: TermName
+    def invoke(inputs: Seq[Tree]): Tree
+    def initialization: Seq[Tree] => Seq[Tree]
+    override def toString = description
+  }
+
+  object DagNode {
+
+    private final class DagNodeImpl(val kind: Kind,
+        val description: String,
+        val initialization: Seq[Tree] => Seq[Tree],
+        val invoker: Seq[Tree] => Tree,
+        val typ: Type,
+        val sourcePos: Position,
+        baseName: => String) extends DagNode(IdGen.next) {
+
+      assert(typ != null, s"could not infer type on tree $description")
+      
+      def invoke(inputs: Seq[Tree]): Tree = invoker(inputs)
+      lazy val singletonName = TermName(context.freshName(s"${baseName}Singleton"))
+
+    }
+
+    def apply(kind: Kind,
+      description: String,
+      initialization: Seq[Tree] => Seq[Tree],
+      invoker: Seq[Tree] => Tree,
+      typ: Type,
+      sourcePos: Position,
+      baseName: => String): DagNode = {
+      new DagNodeImpl(kind, description, initialization, invoker, typ, sourcePos, baseName)
+    }
+    
+    def value(kind: Kind, initialization: Seq[Tree], value: Tree, typ: Type, sourcePos: Position) = {
+      apply(kind, s"$value", trees => initialization, (trees) => value, typ, sourcePos, typ.typeSymbol.name.decodedName.toString)
+    }
+    
+    def methodCall(kind: Kind, containerTermName: Option[TermName], method: Symbol) = {
+      lazy val methodSymbol = method.asMethod
+      apply(kind, s"$method", trees => Nil, inputs => reflectUtils.methodCall(containerTermName, methodSymbol, inputs), methodSymbol.returnType, method.pos, method.name.decodedName.toString)    }
+
+    def constructorCall(kind: Kind, containerTermName: Option[TermName], typ: Type, constructor: MethodSymbol, members: Seq[Tree]) = {
+      val invoker: Seq[Tree] => Tree = { inputs => 
+        if (members.isEmpty) reflectUtils.methodCall(containerTermName, constructor, inputs)
+        else reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, inputs, members)
+      }
+      apply(kind, s"$constructor", trees => Nil, invoker, typ, constructor.pos, typ.typeSymbol.name.decodedName.toString)
+    }
+    
   }
 
 }

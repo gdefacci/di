@@ -7,27 +7,27 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
   import context.universe._
 
-  def toDagNodesWithRefs(valueExpr: context.Expr[_], kindProvider: Symbol => Kind): Map[(Id, Symbol), Dag[DagNodeOrRef]] = {
+  def toDagNodesWithRefs(valueExpr: context.Expr[_], kindProvider: Symbol => Kinds): Map[(Id, Symbol), Dag[DagNodeOrRef]] = {
     val exprTyp = valueExpr.actualType
     val exprNm = TermName(context.freshName(exprTyp.typeSymbol.name.decodedName.toString))
-    val exprDag = alias(exprNm, valueExpr.tree, kindProvider(valueExpr.tree.symbol))
-    val dags = exprDag +: membersSelect.bindings(exprTyp).map { member =>
-      methodDag(exprDag, exprNm, member, kindProvider)
+    val exprDag = alias(exprNm, valueExpr.tree, Kind.default)
+    val dags = exprDag +: membersSelect.bindings(exprTyp).flatMap { member =>
+      methodDag(exprDag, exprNm, member, kindProvider).toSeq
     }
 
     val bindInsts:Seq[((Id, Symbol), Dag[DagNodeOrRef])] = membersSelect.bindInstances(exprTyp).flatMap {
       case membersSelect.BindInstance(member, abstractType, concreteType) =>
-        val knd = kindProvider(member)
+        val knds = kindProvider(member)
         if (concreteType.isAbstract) {
           context.abort(member.pos, s"The second type parameter of Bind must be a concrete class, ${concreteType} is not")
         }
-        knd.ids.map( id => (id -> abstractType) -> Leaf[DagNodeOrRef](Ref(knd, concreteType.info, member.pos)))
+        val ref = Ref(knds, concreteType.info, member.pos)
+        knds.ids.map( id => (id -> abstractType) -> Leaf[DagNodeOrRef](ref))
     }
     
-    val mappingsSeq = dags.flatMap { dg =>
-      dg.value.kind.ids.map( id  =>
-        (id -> dg.value.typ.typeSymbol) -> dg
-      )
+    val mappingsSeq = dags.flatMap { 
+      case dg @ Leaf(dn:DagNode) => (dn.kind.id -> dn.typ.typeSymbol) -> dg :: Nil
+      case dg @ Node(dn:DagNode, _) => (dn.kind.id -> dn.typ.typeSymbol) -> dg :: Nil      case _ => Nil
     }
     
     val allMappings = mappingsSeq ++ bindInsts
@@ -55,10 +55,27 @@ ${dupEntry._2.map { v => v._2 }.mkString("\n")}
   def instantiateObject[T](knd: Kind,
                            typ: Type,
                            mappings: Map[(Id, Symbol), Dag[DagNodeOrRef]],
-                           kindProvider: Symbol => Kind): Expr[T] = {
+                           kindProvider: Symbol => Kinds): Expr[T] = {
     val dag = instantiateDag(knd, typ, mappings, kindProvider)
-    val dagExpr = dagToExpr(dag)
-    context.Expr[T](dagExpr.toTree)
+    
+    val dag1 = Dag.update(dag) { (v, inps) =>
+      val v1 = 
+        if (v.kind.scope != SingletonScope) v
+        else 
+          DagNode(v.kind,
+              s"singleton${v.description}}",
+              inps => Seq(q"""
+                val ${v.singletonName} = ${v.invoke(inps)}
+                """),
+              inps => q"${v.singletonName}",
+              v.typ,
+              v.sourcePos,
+              "singleton")
+      if (inps.isEmpty) Leaf(v1) else Node(v1, inps)
+    }
+    
+    val dagExpr = dagToExpr(dag1)
+    context.Expr[T](context.typecheck(dagExpr.toTree))
   }
 
 }

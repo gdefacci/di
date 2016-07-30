@@ -78,9 +78,6 @@ class ConstructorTests extends FunSuite{
     import samples2._
 
     val service = IOC.get[ServiceA](module4, module3)
-    val serviceTxt = IOC.getSource[ServiceA](module4, module3)
-
-    println(serviceTxt)
     assert( service.repo == new TestRepo(module3.mybool) )
     assert( service.httpClient == new TestHttpClient(module4.timeout) )
   }
@@ -96,12 +93,9 @@ class ConstructorTests extends FunSuite{
 
     import samples2._
 
-    val rtxt = IOC.getSource[AbstractServiceProvider](module1, module3)
-
-    println(rtxt)
-
     val r = IOC.get[AbstractServiceProvider](module1, module3)
     assert(r.b == module3.mybool)
+    
     val service: Service = r.getService(User("pippo"))
 
     assert( service.repository == new SqlRepo(Connection(User("pippo"))) )
@@ -135,7 +129,17 @@ class ConstructorTests extends FunSuite{
     import samples2._
 
     val service = IOC.get[ServiceDRepo](samples2.module5BindQualifier)
+    val serviceTxt = IOC.getSource[ServiceDRepo](samples2.module5BindQualifier)
     assert( service.repo1 == new TestRepo(true) )
     assert( service.repo2 == new TestRepo(false) )
+  }
+  
+  test("singleton") {
+  
+    import org.obl.di.twittersample._
+
+    val app2 = IOC.get[ApplicationComponentImpl](TwitterModule, "user")
+  
+    assert(app2.getTweeter.api == app2.getTimeline.api)
   }
 }
