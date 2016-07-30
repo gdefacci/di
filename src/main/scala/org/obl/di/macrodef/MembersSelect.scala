@@ -23,7 +23,7 @@ private[di] class MembersSelect[C <: Context](val context: C) {
   private def isBindingMethod = (member: Symbol) =>
     isPublicMethod(member) && !isBindInstance(member) 
 
-  private val bindType = typeOf[org.obl.di.Bind[_,_]]
+  private val bindType = typeOf[org.obl.di.runtime.Bind[_,_]]
 
   private def isBindInstance = (member: Symbol) =>
     member.asMethod.returnType <:< bindType 

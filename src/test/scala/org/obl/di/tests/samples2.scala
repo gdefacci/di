@@ -2,7 +2,7 @@ package org.obl.di.tests
 
 import javax.inject.Named
 
-import org.obl.di.{Bind}
+import org.obl.di.runtime.{Bind}
 import scala.annotation.StaticAnnotation
 import javax.inject.Qualifier
 import scala.annotation.ClassfileAnnotation
