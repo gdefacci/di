@@ -28,13 +28,13 @@ private[di] class MembersSelect[C <: Context](val context: C) {
   private def isBindInstance = (member: Symbol) =>
     member.asMethod.returnType <:< bindType 
 
-  private def isNoArgsMethod = (member: Symbol) =>
-    member.isMethod && (member.asMethod.paramLists.map(_.length).sum == 0)
-
   private def isAbstractMethod = (member: Symbol) =>
     member.isMethod && member.isAbstract
 
-  def bindings(t: context.universe.Type): Seq[MethodSymbol] = {
+  def getBindings[T](t: context.universe.Type, 
+      onBinding:MethodSymbol => T, 
+      onBindInstance:BindInstance => T):Seq[T]  = {
+    
     if (isPrimitive(t)) Nil
     else {
       lazy val skipMethods =
@@ -43,25 +43,18 @@ private[di] class MembersSelect[C <: Context](val context: C) {
   
       t.members.collect {
         case m if isBindingMethod(m) && !skipMethods.contains(m.name.toTermName.decodedName.toString) =>
-  
-          m.asMethod
+          onBinding(m.asMethod)
+        case m if isPublicMethod(m) && m.asMethod.isGetter && isBindInstance(m) =>
+          val bindTyp = m.asMethod.returnType
+          bindTyp.typeArgs match {
+            case List(abstractType, concreteType) => onBindInstance(BindInstance(m.asMethod, abstractType.typeSymbol, concreteType.typeSymbol))
+            case _ => context.abort(m.pos, s"Invalid bind type $bindTyp")
+          }
       }.toSeq
     }
   }
 
   case class BindInstance(method:MethodSymbol, abstractType:Symbol, concreteType:Symbol)
-
-  def bindInstances(t: context.universe.Type): Seq[BindInstance] = {
-    if (isPrimitive(t)) Nil
-    else t.members.collect {
-      case m if isPublicMethod(m) && m.asMethod.isGetter && isBindInstance(m) =>
-        val bindTyp = m.asMethod.returnType
-        bindTyp.typeArgs match {
-          case List(abstractType, concreteType) => BindInstance(m.asMethod, abstractType.typeSymbol, concreteType.typeSymbol)
-          case _ => context.abort(m.pos, s"Invalid bind type $bindTyp")
-        }
-    }.toSeq
-  }
 
   def abstractMembers(t: context.universe.Type): Seq[MethodSymbol] = {
     if (isPrimitive(t)) Nil

@@ -62,49 +62,40 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
     annotationTpe.typeSymbol.annotations.exists(ann => ann.tree.tpe =:= typeOfAnnotation)
   }
 
-  private def annotationIds(annotations: List[Annotation]): Set[Id] = {
-    val r = annotations.toSet.flatMap { annotation: Annotation =>
-      val annotationTpe: Type = annotation.tree.tpe 
-      if (annotationTpe =:= javaxInjectNamed) {
-        val annName = annotationStringAttribute(annotation, "value").getOrElse {
-          context.abort(context.enclosingPosition, "value attribute is mandatory for javax.injectNamed")
-        }
-        Set[Id](WithName(annName))
-      } else if (isAnnotated(annotationTpe, javaxInjectQualifier)) {
-        annotation.tree.children match {
-          case Nil => throw new RuntimeException("annotation macro erro")
-          case Select(_, name) :: rest =>
-            val parsMap = rest.collect {
-              case arg@AssignOrNamedArg(id: Ident, Literal(Constant(v))) =>
-                id.name.decodedName.toString -> v
-            }
-            Set[Id](WithQualifier(name.decodedName.toString, parsMap.toMap))
-        }
-      } else {
-//        val itemType = typeOf[org.obl.di.Item[_]]
-////        context.warning(annotation.tree.pos, "annotation  =" + annotation.tree.children.mkString(" -- "))
-//        if (annotation.tree.tpe <:< itemType){
-//          context.warning(annotation.tree.pos, "annotation  =" + annotation.tree.tpe.typeArgs.mkString(", "))
-//        }
-
-        Set.empty[Id]
+  private def annotationId(annotation: Annotation): Option[Id] = {
+    val annotationTpe: Type = annotation.tree.tpe
+    if (annotationTpe =:= javaxInjectNamed) {
+      val annName = annotationStringAttribute(annotation, "value").getOrElse {
+        context.abort(context.enclosingPosition, "value attribute is mandatory for javax.injectNamed")
       }
+      Some(WithName(annName))
+    } else if (isAnnotated(annotationTpe, javaxInjectQualifier)) {
+      annotation.tree.children match {
+        case Nil => throw new RuntimeException("annotation macro erro")
+        case Select(_, name) :: rest =>
+          val parsMap = rest.collect {
+            case arg @ AssignOrNamedArg(id: Ident, Literal(Constant(v))) =>
+              id.name.decodedName.toString -> v
+          }
+          Some(WithQualifier(name.decodedName.toString, parsMap.toMap))
+      }
+    } else {
+      //        val itemType = typeOf[org.obl.di.Item[_]]
+      ////        context.warning(annotation.tree.pos, "annotation  =" + annotation.tree.children.mkString(" -- "))
+      //        if (annotation.tree.tpe <:< itemType){
+      //          context.warning(annotation.tree.pos, "annotation  =" + annotation.tree.tpe.typeArgs.mkString(", "))
+      //        }
+
+      None
     }
-    if (r.nonEmpty) r else Set(Global)
   }
 
-  private def annotationScope(annotations: List[Annotation]): Option[DagScope] = {
-    annotations.flatMap { annotation: Annotation =>
+  private def annotationScope(annotation: Annotation): Option[DagScope] = {
       if (annotation.tree.tpe =:= javaxInjectSingleton) {
         //context.warning(annotation.tree.pos, "SingletonScope --")
-        Seq[DagScope](SingletonScope)
+        Some(SingletonScope)
       } else
-        Seq.empty[DagScope]
-    }.toSeq match {
-      case Seq() => None
-      case hd +: Seq() => Some(hd)
-      case _ => context.abort(context.enclosingPosition, "more than one scope annotation ")
-    }
+        None
   }
 
   def apply(sym: context.Symbol): Kinds = {
@@ -117,10 +108,18 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
         sym.annotations
       } else
         Nil
-
-
-      Kinds(annotationIds(annotations), annotationScope(annotations).getOrElse(DefaultScope))
-
+        
+      val z:(Set[Id], Option[DagScope]) = Set.empty -> None  
+      val (ids, optScope) = annotations.foldLeft(z) { (acc, annotation) =>
+        val (ids, scope) = acc
+        val nscope = (scope -> annotationScope(annotation)) match {
+          case (Some(_), Some(_)) => context.abort(context.enclosingPosition, "more than one scope annotation ")
+          case (x,y) => y.orElse(x)
+        } 
+        (ids ++ annotationId(annotation).toSet) -> nscope
+      }
+      
+      Kinds(if (ids.nonEmpty) ids else Set(Global), optScope.getOrElse(DefaultScope))
     } getOrElse {
       Kinds.default
     }
