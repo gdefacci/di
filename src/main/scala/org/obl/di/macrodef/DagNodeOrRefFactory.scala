@@ -42,9 +42,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     val parametersDags: Seq[Dag[DagNodeOrRef]] = paramListsDags(paramLists, kindProvider)
     assert(paramLists.map(_.length).sum == parametersDags.length)
     val knds = kindProvider(method)
-    //context.warning(method.pos, "Knds "+knds)
-    
-    knds.ids.map( id => Node[DagNodeOrRef](DagNode.methodCall(Kind(id, knds.scope), Some(containerTermName), method), container +: parametersDags.toSeq))
+    knds.ids.map( id => Node[DagNodeOrRef](DagNode.methodCall(Kind(id, knds.scope), Some(containerTermName), method), parametersDags.toSeq :+ container))
   }
   
   def constructorDag(knd:Kind,

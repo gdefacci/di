@@ -114,5 +114,17 @@ object samples2 {
 
     @Qual1(value = 2, name = "aaa") val myboolRepo2 = false
   }
+  
+  object module6 {
+
+    case class TestRepo(admin: Boolean) extends Repository {
+      val conn = Connection(User(if (admin) "admin" else "guest"))
+    }
+
+    case class TestHttpClient(timeout: Int) extends HttpClient
+
+    val timeout = 10
+
+  }
 
 }

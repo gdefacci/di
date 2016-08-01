@@ -69,9 +69,10 @@ private[di] trait DagNodes[C <: Context] {
       apply(kind, s"$method", trees => Nil, inputs => reflectUtils.methodCall(containerTermName, methodSymbol, inputs), methodSymbol.returnType, method.pos, method.name.decodedName.toString)    }
 
     def constructorCall(kind: Kind, containerTermName: Option[TermName], typ: Type, constructor: MethodSymbol, members: Seq[Tree]):DagNode = {
-      val invoker: Seq[Tree] => Tree = { inputs => 
-        if (members.isEmpty) reflectUtils.methodCall(containerTermName, constructor, inputs)
-        else reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, inputs, members)
+      val invoker: Seq[Tree] => Tree = if (members.isEmpty) { inputs => 
+        reflectUtils.methodCall(containerTermName, constructor, inputs)
+      } else { inputs => 
+        reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, inputs, members)
       }
       apply(kind, s"$constructor", trees => Nil, invoker, typ, constructor.pos, typ.typeSymbol.name.decodedName.toString)
     }

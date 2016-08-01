@@ -14,18 +14,15 @@ private[di] class ReflectUtils[C <: Context](val context: C) {
   }
 
   def methodCall(container: Option[TermName], method: MethodSymbol, args: Seq[context.universe.Tree]) = {
-    val (exprValue, args1) = if (method.isConstructor) {
-      Select(New(Ident(method.owner)), termNames.CONSTRUCTOR) -> args.toList
+    val exprValue = if (method.isConstructor) {
+      Select(New(Ident(method.owner)), termNames.CONSTRUCTOR)
     } else {
-      (container match {
+      container match {
         case None => q"$method"
         case Some(container) => q"$container.$method"
-      }) -> (args match {
-        case Nil => Nil
-          case _ +: tail => tail.toList
-      })
+      }
     }
-    val pars = Utils.byLengthsPartition(method.paramLists.map(_.length), args1)
+    val pars = Utils.byLengthsPartition(method.paramLists.map(_.length), args.toList)
     applyParameters(exprValue, pars)
   }
 

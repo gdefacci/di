@@ -7,15 +7,12 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
   import context.universe._
   
-  type MappingEntry = ((Id, Symbol), Dag[DagNodeOrRef])
-
   def toDagNodesWithRefs(valueExpr: context.Expr[_], kindProvider: Symbol => Kinds): Providers[DagNodeOrRef] = {
     val exprTyp = valueExpr.actualType
     val exprNm = TermName(context.freshName(exprTyp.typeSymbol.name.decodedName.toString))
     val exprDag = alias(exprNm, valueExpr.tree, Kind.default)
 
-    val allMappings = ((exprDag.value.kind.id -> exprDag.value.typ.typeSymbol) -> exprDag) +: membersSelect.getBindings[Seq[MappingEntry]](exprTyp,
-      { member =>
+    val membersMapping = membersSelect.getBindings[Seq[((Id, Symbol), Dag[DagNodeOrRef])]](exprTyp, { member =>
         methodDag(exprDag, exprNm, member, kindProvider).toSeq.flatMap {
           case dg @ Leaf(dn: DagNode) => (dn.kind.id -> dn.typ.typeSymbol) -> dg :: Nil
           case dg @ Node(dn: DagNode, _) => (dn.kind.id -> dn.typ.typeSymbol) -> dg :: Nil
@@ -27,9 +24,10 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
           if (concreteType.isAbstract) {
             context.abort(member.pos, s"The second type parameter of Bind must be a concrete class, ${concreteType} is not")
           }
-          //val ref = Ref(knds, concreteType.info, member.pos)
           knds.ids.toSeq.map(id => (id -> abstractType) -> Leaf[DagNodeOrRef]( Ref(Kind(id, knds.scope), concreteType.info, member.pos) ))
       }).flatten
+    
+    val allMappings = ((exprDag.value.kind.id -> exprDag.value.typ.typeSymbol) -> exprDag) +: membersMapping 
 
     Providers(allMappings)
   }

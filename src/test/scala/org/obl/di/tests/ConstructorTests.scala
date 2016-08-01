@@ -158,4 +158,13 @@ class ConstructorTests extends FunSuite{
     assert( seq2.toSet == Set(NMod1.i1, NMod2.i1) )
     
   }
+  
+  test("class declarations in modules") {
+
+    import samples2._
+
+    val service = IOC.get[ServiceA](module6, module3)
+    assert( service.repo == new module6.TestRepo(module3.mybool) )
+    assert( service.httpClient == new module6.TestHttpClient(module4.timeout) )
+  }
 }

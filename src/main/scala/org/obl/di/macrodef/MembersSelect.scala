@@ -52,6 +52,8 @@ private[di] class MembersSelect[C <: Context](val context: C) {
             case List(abstractType, concreteType) => onBindInstance(BindInstance(m.asMethod, abstractType.typeSymbol, concreteType.typeSymbol))
             case _ => context.abort(m.pos, s"Invalid bind type $bindTyp")
           }
+        case m if m.isType && !m.isAbstract && getPrimaryConstructor(m.asType.toType).isDefined =>
+          onBinding(getPrimaryConstructor(m.asType.toType).get)
       }.toSeq
     }
   }

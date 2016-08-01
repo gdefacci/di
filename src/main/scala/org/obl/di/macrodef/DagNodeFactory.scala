@@ -51,6 +51,10 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     }
   }
   
+  private def subTypesDag(id:Id, typ:Type) = {
+    
+  }
+  
   private def refToDagNode(ref: Ref,
     mappings: Providers[DagNodeOrRef],
     kindProvider: Symbol => Kinds): Dag[DagNode] = {
@@ -64,28 +68,16 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
         }
         if (typMappings.length == 1) typMappings.head 
         else if (typMappings.length == 0) {
-          val subClasses = mappings.filter {
-            case ((id, _), sdgn) => sdgn.value.typ != ref.typ && sdgn.value.typ.resultType <:< ref.typ && (ref.kind.id == id)
-          }.toSeq
-          subClasses match {
-            case Seq() =>
-              checkIsNotPrimitive(ref.kind.id, ref.typ)
-              val constructorMethod = membersSelect.getPrimaryConstructor(ref.typ).getOrElse {
-                context.abort(ref.sourcePos, s"cant find primary constructor for ${typSymbol.fullName}")
-              }
-              val dnd = constructorDag(Kind.derived, ref.typ, constructorMethod, mappings, kindProvider, Nil)
-              val nmappings = dnd.value match {
-                case dn:DagNode => Map((dn.kind.id -> typSymbol) -> dnd)
-                case _ => Map.empty
-              }
-              dagNodeOrRefToDagNode(dnd, mappings, kindProvider)
-  
-            case Seq(hd) =>
-              dagNodeOrRefToDagNode(hd._2, mappings, kindProvider)
-  
-            case ambRefs =>
-              context.abort(ref.sourcePos, s"more than 1 instance available for ${ref.typ} with id ${ref.kind.id} ${ambRefs.map(_._2.value).mkString(", ")}")
+          checkIsNotPrimitive(ref.kind.id, ref.typ)
+          val constructorMethod = membersSelect.getPrimaryConstructor(ref.typ).getOrElse {
+            context.abort(ref.sourcePos, s"cant find primary constructor for ${typSymbol.fullName}")
           }
+          val dnd = constructorDag(Kind.derived, ref.typ, constructorMethod, mappings, kindProvider, Nil)
+          val nmappings = dnd.value match {
+            case dn:DagNode => Map((dn.kind.id -> typSymbol) -> dnd)
+            case _ => Map.empty
+          }
+          dagNodeOrRefToDagNode(dnd, mappings, kindProvider)
         } else
           context.abort(ref.sourcePos, s"more than 1 instance available for ${ref.typ} with id ${ref.kind.id} ${typMappings.map(_.value).mkString(", ")}")
     
@@ -101,16 +93,14 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
 
   private def toDagNodes(mappings: Providers[DagNodeOrRef],
     kindProvider: Symbol => Kinds): Seq[Dag[DagNode]] = {
-    val z: (Providers[DagNodeOrRef], Seq[Dag[DagNode]], Set[DagNodeOrRef]) = (mappings, Nil, Set.empty)
+    val z: (Providers[DagNodeOrRef], Seq[Dag[DagNode]]) = (mappings, Nil)
     mappings.values.foldLeft(z) { (acc, dagOrRef) =>
-      val (mappings, resSeq, visited) = acc
-      if (visited.contains(dagOrRef.value)) acc
-      else {
+      val (mappings, resSeq) = acc
         val dn: Dag[DagNode] = dagNodeOrRefToDagNode(dagOrRef, mappings, kindProvider)
-        ( mappings + ((dn.value.kind.id -> dn.value.typ.typeSymbol) -> dn), 
-            (resSeq :+ dn),
-            (visited + dagOrRef.value))
-      }
+        val nmapings = mappings + ((dn.value.kind.id -> dn.value.typ.typeSymbol) -> dn)
+        val nres = resSeq :+ dn
+        
+        nmapings -> nres
     }._2
   }
 
@@ -125,8 +115,10 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     val members = membersDagInfo.map(_.toTree)
 
     primaryConstructor.fold(
-      valueDag[DagNode](Nil, reflectUtils.newTrait(typ.typeSymbol, members), Kind.default))(constr =>
-        dagNodeOrRefToDagNode(constructorDag(Kind.derived, typ, constr, mappings, kindProvider, members), mappings, kindProvider))
+        valueDag[DagNode](Nil, reflectUtils.newTrait(typ.typeSymbol, members), Kind.default)
+      )(constr =>
+        dagNodeOrRefToDagNode(constructorDag(Kind.derived, typ, constr, mappings, kindProvider, members), mappings, kindProvider)
+      )
   }
 
   private case class MemberDagInfo(methodName: TermName, paramss: List[List[Symbol]], returnType: Symbol, dag: Dag[DagNode]) {
