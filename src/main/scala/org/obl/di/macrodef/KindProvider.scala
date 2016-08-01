@@ -11,12 +11,14 @@ object Kinds {
 }
 
 private[di] object Kind {
-  def default = Kind(Global, DefaultScope)
+  val default = Kind(Global, DefaultScope)
+  val derived = Kind(Derived, DefaultScope)
 }
 
 private[di] sealed trait Id
 
 private[di] case object Global extends Id
+private[di] case object Derived extends Id
 
 private[di] case class WithName(name: String) extends Id
 
@@ -97,7 +99,7 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
       } else
         None
   }
-
+  
   def apply(sym: context.Symbol): Kinds = {
     Option(sym).map { sym =>
 
@@ -109,14 +111,14 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
       } else
         Nil
         
-      val z:(Set[Id], Option[DagScope]) = Set.empty -> None  
-      val (ids, optScope) = annotations.foldLeft(z) { (acc, annotation) =>
-        val (ids, scope) = acc
+      val z:(Set[Id], Option[DagScope], Option[Boolean]) = (Set.empty, None, None)  
+      val (ids, optScope, isItem) = annotations.foldLeft(z) { (acc, annotation) =>
+        val (ids, scope, isItem) = acc
         val nscope = (scope -> annotationScope(annotation)) match {
           case (Some(_), Some(_)) => context.abort(context.enclosingPosition, "more than one scope annotation ")
           case (x,y) => y.orElse(x)
         } 
-        (ids ++ annotationId(annotation).toSet) -> nscope
+        ((ids ++ annotationId(annotation).toSet), nscope, isItem)
       }
       
       Kinds(if (ids.nonEmpty) ids else Set(Global), optScope.getOrElse(DefaultScope))

@@ -142,4 +142,20 @@ class ConstructorTests extends FunSuite{
   
     assert(app2.getTweeter.api == app2.getTimeline.api)
   }
+  
+  test("multi integers") {
+    
+    import MultiModule._
+    assert( IOC.get[Seq[Int]](Mod1, Mod2, Mod3).toSet == Set(Mod1.i1, Mod1.i2, Mod2.i3, Mod3.i455) )
+    
+  }
+  
+  test("named multi integers") {
+    
+    import MultiModule._
+    val (seq1, seq2) = IOC.get[(Seq[Int], Seq[Int])](NMod1, NMod2, NMod3)
+    assert( seq1.toSet == Set(NMod1.i2, NMod2.i2, NMod3.i455) )
+    assert( seq2.toSet == Set(NMod1.i1, NMod2.i1) )
+    
+  }
 }

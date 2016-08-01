@@ -106,7 +106,7 @@ object samples2 {
 
     def create(@Qual1(value = 1, name = "aaa") r1:Repository, r2:Repository) = ServiceDRepo(r1,r2)
 
-    @Qual1(value = 1, name = "aaa") val bindRepo = Bind[Repository, TestRepo]
+    @Named("blah blah") @Named("blah blah 1") @Qual1(value = 1, name = "aaa") val bindRepo = Bind[Repository, TestRepo]
 
     val mybool = true
 

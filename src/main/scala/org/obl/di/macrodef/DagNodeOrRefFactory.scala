@@ -25,15 +25,21 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     """)
     Leaf(DagNode.value(kind, initialization, v,  typ, v.pos))  }
 
+  private def paramListsDags(paramLists:List[List[Symbol]], kindProvider: Symbol => Kinds) = 
+    paramLists.flatMap(pars => pars.map { par =>
+      val knd = kindProvider(par)
+      if (knd.ids.size > 1) {
+        context.abort(par.pos, "parameters that are not multi target must have at most one identifier annotation")
+      }
+      Leaf[DagNodeOrRef](Ref(Kind(knd.ids.head, knd.scope), par.info, par.pos))
+    })
 
   def methodDag(container: Dag[DagNodeOrRef],
                 containerTermName: TermName,
                 method: Symbol,
                 kindProvider: Symbol => Kinds): Set[Dag[DagNodeOrRef]] = {
     val paramLists = method.asMethod.paramLists
-    val parametersDags: Seq[Dag[DagNodeOrRef]] = paramLists.flatMap(pars => pars.map(par =>
-      Leaf[DagNodeOrRef](Ref(kindProvider(par), par.info, par.pos))
-    ))
+    val parametersDags: Seq[Dag[DagNodeOrRef]] = paramListsDags(paramLists, kindProvider)
     assert(paramLists.map(_.length).sum == parametersDags.length)
     val knds = kindProvider(method)
     //context.warning(method.pos, "Knds "+knds)
@@ -41,22 +47,19 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     knds.ids.map( id => Node[DagNodeOrRef](DagNode.methodCall(Kind(id, knds.scope), Some(containerTermName), method), container +: parametersDags.toSeq))
   }
   
-  def constructorDag(exprType:Type,
+  def constructorDag(knd:Kind,
+                     exprType:Type,
                      constructorMethod:MethodSymbol,
-                     mappings: Map[(Id, Symbol), Dag[DagNodeOrRef]],
+                     mappings: Providers[DagNodeOrRef],
                      kindProvider: Symbol => Kinds,
                      members:Seq[Tree]): Dag[DagNodeOrRef] = {
     val typ = constructorMethod.owner
     if (!typ.isClass) {
       context.abort(context.enclosingPosition, typ.toString())
     }
-    val parametersDags: Seq[Dag[DagNodeOrRef]] = constructorMethod.paramLists.flatMap(pars =>
-      pars.map { par =>
-        val knd = kindProvider(par)
-            Leaf[DagNodeOrRef](Ref(knd, par.info, par.pos))
-      }).toSeq
+    val parametersDags: Seq[Dag[DagNodeOrRef]] = paramListsDags(constructorMethod.paramLists, kindProvider)
     assert(parametersDags.length == constructorMethod.paramLists.map(_.length).sum)
-    Node[DagNodeOrRef](DagNode.constructorCall(Kind.default, None, exprType, constructorMethod, members), parametersDags)
+    Node[DagNodeOrRef](DagNode.constructorCall(knd, None, exprType, constructorMethod, members), parametersDags)
   }
 
   def parameterDag(par:Symbol, knd:Kind): Dag[DagNodeOrRef]  =

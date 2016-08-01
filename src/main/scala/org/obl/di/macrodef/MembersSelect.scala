@@ -1,6 +1,7 @@
 package org.obl.di.macrodef
 
 import scala.reflect.macros.blackbox.Context
+import org.obl.di.runtime.AllBindings
 
 private[di] object MembersSelect {
   val baseSkipMethods = Set("$init$", "synchronized", "##", "!=", "==", "ne", "eq", "asInstanceOf", "isInstanceOf")
@@ -24,6 +25,7 @@ private[di] class MembersSelect[C <: Context](val context: C) {
     isPublicMethod(member) && !isBindInstance(member) 
 
   private val bindType = typeOf[org.obl.di.runtime.Bind[_,_]]
+  private val allBindingsAny = typeOf[AllBindings[_]]
 
   private def isBindInstance = (member: Symbol) =>
     member.asMethod.returnType <:< bindType 
@@ -67,4 +69,16 @@ private[di] class MembersSelect[C <: Context](val context: C) {
     typ.decls.collectFirst {
       case sym: MethodSymbol if sym.isPrimaryConstructor && sym.isPublic => sym
     }
+  
+  def isMultiTarget(typ:Type) = {
+    typ.erasure =:= allBindingsAny
+  }
+  
+  def multiTargetItem(typ:Type):Option[Type] = {
+    if (isMultiTarget(typ)) {
+      val itmTyp = typ.dealias.typeArgs.head
+      Some(itmTyp)
+    } else 
+      None
+  }
 }

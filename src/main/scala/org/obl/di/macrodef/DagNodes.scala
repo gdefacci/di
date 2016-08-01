@@ -15,23 +15,22 @@ private[di] trait DagNodes[C <: Context] {
   }
 
   sealed trait DagNodeOrRef {
+    def kind: Kind
     def typ: Type
     def sourcePos: Position
-
+    def description:String
+    override def toString = description
   }
 
-  sealed case class Ref(val kinds: Kinds, val typ: Type, val sourcePos: Position) extends DagNodeOrRef {
+  sealed case class Ref(val kind: Kind, val typ: Type, val sourcePos: Position) extends DagNodeOrRef {
     assert(typ != null)
     def description: String = s"Reference to type $typ"
   }
   
   sealed abstract case class DagNode(id: Int) extends DagNodeOrRef {
-    val kind: Kind
-    def description: String
     def singletonName: TermName
     def invoke(inputs: Seq[Tree]): Tree
     def initialization: Seq[Tree] => Seq[Tree]
-    override def toString = description
   }
 
   object DagNode {
@@ -69,7 +68,7 @@ private[di] trait DagNodes[C <: Context] {
       lazy val methodSymbol = method.asMethod
       apply(kind, s"$method", trees => Nil, inputs => reflectUtils.methodCall(containerTermName, methodSymbol, inputs), methodSymbol.returnType, method.pos, method.name.decodedName.toString)    }
 
-    def constructorCall(kind: Kind, containerTermName: Option[TermName], typ: Type, constructor: MethodSymbol, members: Seq[Tree]) = {
+    def constructorCall(kind: Kind, containerTermName: Option[TermName], typ: Type, constructor: MethodSymbol, members: Seq[Tree]):DagNode = {
       val invoker: Seq[Tree] => Tree = { inputs => 
         if (members.isEmpty) reflectUtils.methodCall(containerTermName, constructor, inputs)
         else reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, inputs, members)
@@ -78,5 +77,25 @@ private[di] trait DagNodes[C <: Context] {
     }
     
   }
+  
+  private def reportDuplicateMapping[T](id:Id, typeSymbol:Symbol, dags:Seq[Dag[T]]):Nothing = {
+             val text =
+        s"""
+duplicates bindings: ${dags.length}
+type ${typeSymbol} ${id} has more than one binding
+${dags.map { dupEntry => s"""
+${dupEntry}
+"""}.mkString("")}
+"""
+      context.abort(context.enclosingPosition, text)
+  }  
+  
+  type Providers[T] = ProvidersMap[Id, Symbol, T]
 
+  object Providers {
+    
+    def empty[T]:Providers[T] = ProvidersMap.empty[Id, Symbol, T]( reportDuplicateMapping )
+    def apply[T](entries:Seq[((Id, Symbol), Dag[T])]):Providers[T] = ProvidersMap[Id, Symbol,T](entries, reportDuplicateMapping)
+    
+  }
 }
