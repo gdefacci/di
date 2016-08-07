@@ -167,4 +167,14 @@ class ConstructorTests extends FunSuite{
     assert( service.repo == new module6.TestRepo(module3.mybool) )
     assert( service.httpClient == new module6.TestHttpClient(module4.timeout) )
   }
+
+  test("polymorphic types dependencies") {
+     import samples1._
+
+    val p = IOC.get[ModGeneric.Pippo](ModGeneric)
+
+    assert(ModGeneric.Pippo(ModGeneric.l2, ModGeneric.sumList(ModGeneric.l1)) == p )
+
+  }
+  
 }

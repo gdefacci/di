@@ -37,4 +37,15 @@ object samples1 {
     def aIntInstance()()(b:Boolean)()()(c:String):Int = 1333
   }
 
+  object ModGeneric {
+    
+    val l1:List[Int] = List(1,2,4)
+    val l2:List[String] = List("1","2","4")
+    
+    def sumList(l:List[Int]) = l.sum
+    
+    case class Pippo(l1:List[String], l2:Int)
+    
+  }
+  
 }

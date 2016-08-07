@@ -12,7 +12,9 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     mappings: Providers[DagNodeOrRef],
     kindProvider: Symbol => Kinds): Dag[DagNode] = {
 
-    mappings.get(id -> typ.typeSymbol).map { dg =>
+    val mpng = mappings.all(id, (t,nd) => t.asType.toType <:< typ || nd.typ <:< typ)
+    if (mpng .length > 1) context.abort(context.enclosingPosition, s"more than one instance for $id $typ ${mpng.mkString(", ")}")
+    mpng.headOption.map { dg =>
       val dags: Seq[Dag[DagNode]] = toDagNodes(mappings, kindProvider)
       val mappings1: Map[(Id, Symbol), Dag[DagNode]] = dags.map { dg => (dg.value.kind.id -> dg.value.typ.typeSymbol) -> dg }.toMap
       mappings1(id, dg.value.typ.typeSymbol)
@@ -51,10 +53,6 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     }
   }
   
-  private def subTypesDag(id:Id, typ:Type) = {
-    
-  }
-  
   private def refToDagNode(ref: Ref,
     mappings: Providers[DagNodeOrRef],
     kindProvider: Symbol => Kinds): Dag[DagNode] = {
@@ -63,7 +61,12 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     val typSymbol = typ.typeSymbol
     membersSelect.multiTargetItem(typ) match {
       case None =>
-        val typMappings = mappings.all(ref.kind.id, t => t.asType.toType <:< typ).map { dg =>
+        val typMappings = mappings.all(ref.kind.id, { (t, nd) => 
+          // FIXME cycles should be handled properly
+          val r = nd != ref && ((t.asType.toType <:< typ) || (nd.typ <:< typ))    
+          r 
+        }).map { dg =>
+          //context.warning(context.enclosingPosition, s"${dg} ")
           dagNodeOrRefToDagNode(dg, mappings, kindProvider)  
         }
         if (typMappings.length == 1) typMappings.head 
@@ -82,7 +85,10 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
           context.abort(ref.sourcePos, s"more than 1 instance available for ${ref.typ} with id ${ref.kind.id} ${typMappings.map(_.value).mkString(", ")}")
     
       case Some(itemType) => 
-        val insts:Seq[Dag[DagNodeOrRef]] = mappings.all(ref.kind.id, t => t.asType.toType <:< itemType)
+        // FIXME cycles should be handled properly
+        val insts:Seq[Dag[DagNodeOrRef]] = mappings.all(ref.kind.id, (t, nd) => 
+          nd != ref && (t.asType.toType <:< itemType || nd.typ <:< itemType)
+          )
         val nd = DagNode(Kind.default, s"allBindings$itemType", 
             inps => Nil, 
             inps => q"new org.obl.di.runtime.AllBindings[$itemType]( List[$itemType](..$inps) )", 

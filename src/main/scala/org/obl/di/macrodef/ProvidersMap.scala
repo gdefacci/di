@@ -29,27 +29,12 @@ private[di] class ProvidersMap[KI, KT, T] private (val toMap: Map[(KI, KT), Seq[
 
   import ProvidersMap.{groupByMap, distinctValues}
   
-  def toSeq: Seq[((KI, KT), Dag[T])] = toMap.flatMap { e =>
-    e._2.map { v =>
-      e._1 -> v  
-    }  
-  }.toSeq
-
-  def all(kid:KI, typPredicate:KT => Boolean): Seq[Dag[T]] = 
+  def all(kid:KI, typPredicate:(KT, T) => Boolean): Seq[Dag[T]] = 
     toMap.flatMap {
-      case ((id, t), sq) if id == kid && typPredicate(t) => sq
+      case ((id, t), sq) if id == kid => sq.filter( sg => typPredicate(t, sg.value))
       case _ => Nil
     }.toSeq
     
-    
-  def get(k: (KI, KT)): Option[Dag[T]] = {
-    toMap.get(k).flatMap {
-      case Seq() => None
-      case Seq(hd) => Some(hd)
-      case dups => reportDuplicateMapping(k._1, k._2, dups)
-    }
-  }
-
   def +(e: ((KI, KT), Dag[T])): ProvidersMap[KI, KT, T] = this ++ Seq(e)
   def ++(e: Seq[((KI, KT), Dag[T])]): ProvidersMap[KI, KT, T] = this ++ groupByMap(e)
   def ++(e: ProvidersMap[KI, KT, T]): ProvidersMap[KI, KT, T] = this ++ e.toMap
