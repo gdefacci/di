@@ -177,4 +177,18 @@ class ConstructorTests extends FunSuite{
 
   }
   
+ test("polymorphic provider") {
+     import samples1._
+
+    val p1 = IOC.get[Pippo](ModPolymorphic, true)
+
+    assert(Pippo("Pippo", 12) == p1 )
+
+    val p2 = IOC.get[Pippo](ModPolymorphic, false)
+
+    assert(Pippo("Pippy", 27) == p2 )
+
+  }
+ 
+  
 }

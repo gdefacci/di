@@ -12,7 +12,8 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     mappings: Providers[DagNodeOrRef],
     kindProvider: Symbol => Kinds): Dag[DagNode] = {
 
-    val mpng = mappings.all(id, (t,nd) => t.asType.toType <:< typ || nd.typ <:< typ)
+    
+    val mpng = mappings.findMembers(id, (nd) => isSubtype(typ, nd.typ) ) 
     if (mpng .length > 1) context.abort(context.enclosingPosition, s"more than one instance for $id $typ ${mpng.mkString(", ")}")
     mpng.headOption.map { dg =>
       val dags: Seq[Dag[DagNode]] = toDagNodes(mappings, kindProvider)
@@ -53,42 +54,53 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     }
   }
   
+  private def isSubtype(sup:Type, sub:Type) = {
+    sub <:< sup || sub.typeSymbol.asType.toType <:< sup 
+  }
+  
   private def refToDagNode(ref: Ref,
     mappings: Providers[DagNodeOrRef],
     kindProvider: Symbol => Kinds): Dag[DagNode] = {
 
     val typ = ref.typ
+    
     val typSymbol = typ.typeSymbol
     membersSelect.multiTargetItem(typ) match {
       case None =>
-        val typMappings = mappings.all(ref.kind.id, { (t, nd) => 
-          // FIXME cycles should be handled properly
-          val r = nd != ref && ((t.asType.toType <:< typ) || (nd.typ <:< typ))    
-          r 
-        }).map { dg =>
-          //context.warning(context.enclosingPosition, s"${dg} ")
+        val typMappings = mappings.findMembers(ref.kind.id, { (nd) => nd != ref && isSubtype(typ, nd.typ) }).map { dg =>
           dagNodeOrRefToDagNode(dg, mappings, kindProvider)  
         }
         if (typMappings.length == 1) typMappings.head 
         else if (typMappings.length == 0) {
-          checkIsNotPrimitive(ref.kind.id, ref.typ)
-          val constructorMethod = membersSelect.getPrimaryConstructor(ref.typ).getOrElse {
-            context.abort(ref.sourcePos, s"cant find primary constructor for ${typSymbol.fullName}")
+          
+          val polyMembers = mappings.findPolymorphicMembers(ref.kind.id, df => df.apply(typ))
+          
+          context.warning(context.enclosingPosition, ">>" + polyMembers.mkString(", "))
+          
+          if (polyMembers.length > 1) context.abort(context.enclosingPosition, s"found more than a polymorphic factory for ${typSymbol.fullName}")
+          else if (polyMembers.length == 1) {
+            dagNodeOrRefToDagNode(polyMembers.head, mappings, kindProvider)
+          } else {
+          
+            checkIsNotPrimitive(ref.kind.id, typ)
+            val constructorMethod = membersSelect.getPrimaryConstructor(typ).getOrElse {
+              context.abort(context.enclosingPosition, s"cant find primary constructor for ${typSymbol.fullName}")
+            }
+            val dnd = constructorDag(Kind.derived, typ, constructorMethod, mappings, kindProvider, Nil)
+            val nmappings = dnd.value match {
+              case dn:DagNode => Map((dn.kind.id -> typSymbol) -> dnd)
+              case _ => Map.empty
+            }
+            dagNodeOrRefToDagNode(dnd, mappings, kindProvider)
           }
-          val dnd = constructorDag(Kind.derived, ref.typ, constructorMethod, mappings, kindProvider, Nil)
-          val nmappings = dnd.value match {
-            case dn:DagNode => Map((dn.kind.id -> typSymbol) -> dnd)
-            case _ => Map.empty
-          }
-          dagNodeOrRefToDagNode(dnd, mappings, kindProvider)
         } else
-          context.abort(ref.sourcePos, s"more than 1 instance available for ${ref.typ} with id ${ref.kind.id} ${typMappings.map(_.value).mkString(", ")}")
+          context.abort(ref.sourcePos, s"more than 1 instance available for ${typ} with id ${ref.kind.id} ${typMappings.map(_.value).mkString(", ")}")
     
       case Some(itemType) => 
         // FIXME cycles should be handled properly
-        val insts:Seq[Dag[DagNodeOrRef]] = mappings.all(ref.kind.id, (t, nd) => 
-          nd != ref && (t.asType.toType <:< itemType || nd.typ <:< itemType)
-          )
+        val insts:Seq[Dag[DagNodeOrRef]] = mappings.findMembers(ref.kind.id, (nd) => 
+          nd != ref && isSubtype(itemType, nd.typ) 
+        )
         val nd = DagNode(Kind.default, s"allBindings$itemType", 
             inps => Nil, 
             inps => q"new org.obl.di.runtime.AllBindings[$itemType]( List[$itemType](..$inps) )", 
@@ -100,10 +112,10 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
   private def toDagNodes(mappings: Providers[DagNodeOrRef],
     kindProvider: Symbol => Kinds): Seq[Dag[DagNode]] = {
     val z: (Providers[DagNodeOrRef], Seq[Dag[DagNode]]) = (mappings, Nil)
-    mappings.values.foldLeft(z) { (acc, dagOrRef) =>
+    mappings.members.foldLeft(z) { (acc, dagOrRef) =>
       val (mappings, resSeq) = acc
         val dn: Dag[DagNode] = dagNodeOrRefToDagNode(dagOrRef, mappings, kindProvider)
-        val nmapings = mappings + ((dn.value.kind.id -> dn.value.typ.typeSymbol) -> dn)
+        val nmapings = mappings + (dn.value.kind.id  -> dn)
         val nres = resSeq :+ dn
         
         nmapings -> nres
@@ -144,13 +156,13 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
   private def implementMethod(m: MethodSymbol,
     initMappings: Providers[DagNodeOrRef],
     kindProvider: Symbol => Kinds): MemberDagInfo = {
-    val parametersBindings = m.paramLists.flatMap { pars =>
+    val parametersBindings:Seq[(Id, Dag[DagNodeOrRef])] = m.paramLists.flatMap { pars =>
       pars.flatMap { par =>
         val knd = kindProvider(par)
-        knd.ids.map(id => (id -> par.info.typeSymbol) -> parameterDag(par, Kind(id, knd.scope)))
+        knd.ids.map(id => id -> parameterDag(par, Kind(id, knd.scope)))
       }
-    }.toMap
-    val mappings: Providers[DagNodeOrRef] = initMappings ++ parametersBindings.toSeq
+    }
+    val mappings: Providers[DagNodeOrRef] = initMappings ++ parametersBindings
     MemberDagInfo(
       m.name,
       paramss = m.paramLists,

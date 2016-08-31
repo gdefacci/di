@@ -32,10 +32,13 @@ private[di] class MembersSelect[C <: Context](val context: C) {
 
   private def isAbstractMethod = (member: Symbol) =>
     member.isMethod && member.isAbstract
+    
+  def getPolyType(m: MethodSymbol):Option[PolyType] = m.info match {
+    case t @ PolyType(_, _) => Some(t)
+    case _ => None
+  }
 
-  def getBindings[T](t: context.universe.Type, 
-      onBinding:MethodSymbol => T, 
-      onBindInstance:BindInstance => T):Seq[T]  = {
+  def getBindings[T](t: context.universe.Type):Seq[Binding]  = {
     
     if (isPrimitive(t)) Nil
     else {
@@ -45,20 +48,25 @@ private[di] class MembersSelect[C <: Context](val context: C) {
   
       t.members.collect {
         case m if isBindingMethod(m) && !skipMethods.contains(m.name.toTermName.decodedName.toString) =>
-          onBinding(m.asMethod)
+          val mthd = m.asMethod
+          getPolyType(mthd).map( PolyMethodBinding(mthd, _) ).getOrElse(MethodBinding(mthd))
         case m if isPublicMethod(m) && m.asMethod.isGetter && isBindInstance(m) =>
           val bindTyp = m.asMethod.returnType
           bindTyp.typeArgs match {
-            case List(abstractType, concreteType) => onBindInstance(BindInstance(m.asMethod, abstractType.typeSymbol, concreteType.typeSymbol))
+            case List(abstractType, concreteType) => BindInstance(m.asMethod, abstractType.typeSymbol, concreteType.typeSymbol)
             case _ => context.abort(m.pos, s"Invalid bind type $bindTyp")
           }
         case m if m.isType && !m.isAbstract && getPrimaryConstructor(m.asType.toType).isDefined =>
-          onBinding(getPrimaryConstructor(m.asType.toType).get)
+          val mthd = getPrimaryConstructor(m.asType.toType).get
+          getPolyType(mthd).map( PolyMethodBinding(mthd, _) ).getOrElse(MethodBinding(mthd))
       }.toSeq
     }
   }
 
-  case class BindInstance(method:MethodSymbol, abstractType:Symbol, concreteType:Symbol)
+  sealed trait Binding
+  case class MethodBinding(method:MethodSymbol) extends Binding  
+  case class PolyMethodBinding(method:MethodSymbol, methodType:PolyType) extends Binding  
+  case class BindInstance(method:MethodSymbol, abstractType:Symbol, concreteType:Symbol) extends Binding
 
   def abstractMembers(t: context.universe.Type): Seq[MethodSymbol] = {
     if (isPrimitive(t)) Nil

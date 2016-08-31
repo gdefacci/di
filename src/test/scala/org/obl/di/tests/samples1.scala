@@ -48,4 +48,17 @@ object samples1 {
     
   }
   
+  object ModPolymorphic {
+    
+    def toOption[T](t:T):Option[T] = Some(t)
+    
+    def createPippo(b:Option[Boolean]):Pippo = b match {
+      case None => Pippo("None",0)
+      case Some(false) => Pippo("Pippy",27)
+      case Some(true) => Pippo("Pippo",12)
+    }
+
+    
+  }
+  
 }

@@ -29,7 +29,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     paramLists.flatMap(pars => pars.map { par =>
       val knd = kindProvider(par)
       if (knd.ids.size > 1) {
-        context.abort(par.pos, "parameters that are not multi target must have at most one identifier annotation")
+        context.abort(par.pos, "parameters must have at most one identifier annotation")
       }
       Leaf[DagNodeOrRef](Ref(Kind(knd.ids.head, knd.scope), par.info, par.pos))
     })
