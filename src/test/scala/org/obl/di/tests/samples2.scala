@@ -6,6 +6,7 @@ import org.obl.di.runtime.{Bind}
 import scala.annotation.StaticAnnotation
 import javax.inject.Qualifier
 import scala.annotation.ClassfileAnnotation
+import javax.inject.Singleton
 
 object samples2 {
 
@@ -127,4 +128,17 @@ object samples2 {
 
   }
 
+  case class Service1(val repository: Repository)
+  case class Service2(service:Service, service1:Service1)
+
+  class MyRepo extends Repository {
+    def conn: Connection = Connection(User("my"))
+  }
+  
+  object module7 {
+    
+    @Singleton
+    val bindRepo = Bind[Repository, MyRepo]
+    
+  }
 }

@@ -12,6 +12,9 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     def addMembers(ms: Seq[(Id, Dag[DagNodeOrRef])]) = copy(members = members ++ ms)
     def addPolyMembers(ms: Seq[(Id, DagNodeDagFactory)]) = copy(polyMembers = polyMembers ++ ms)
   }
+  
+  def findRefs(dg:Dag[DagNodeOrRef]) =
+    Dag.visit(dg).collect { case Leaf(r:Ref) => r }
 
   def toDagNodesWithRefs(valueExpr: context.Expr[_], kindProvider: Symbol => Kinds): Providers[DagNodeOrRef] = {
     val exprTyp = valueExpr.actualType
@@ -21,17 +24,23 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     val z = ModuleMappings(Nil, Nil)
     val membersMapping = membersSelect.getBindings(exprTyp).foldLeft(z) {
       case (acc, membersSelect.MethodBinding(member)) =>
-        acc.addMembers(methodDag(exprDag, exprNm, member, kindProvider).toSeq.flatMap {
+        val dgs = methodDag(exprDag, exprNm, member, kindProvider).toSeq.flatMap {
           case dg @ Leaf(dn: DagNode) => (dn.kind.id -> dg) :: Nil
           case dg @ Node(dn: DagNode, _) => (dn.kind.id -> dg) :: Nil
           case _ => Nil
-        })
+        }
+//        dgs.foreach { case (id, dg) =>
+//          findRefs(dg).foreach { rf =>
+//            context.warning(rf.sourcePos, rf.typ.toString)  
+//          }
+//        }
+        acc.addMembers(dgs)
       case (acc, membersSelect.BindInstance(member, abstractType, concreteType)) =>
         val knds = kindProvider(member)
         if (concreteType.isAbstract) {
           context.abort(member.pos, s"The second type parameter of Bind must be a concrete class, ${concreteType} is not")
         }
-        acc.addMembers(knds.ids.toSeq.map(id => id -> Leaf[DagNodeOrRef](Ref(Kind(id, knds.scope), concreteType.info, member.pos))))
+        acc.addMembers(knds.ids.toSeq.map(id => id -> Leaf[DagNodeOrRef](Ref(Kind(id, knds.scope), concreteType.asType.toType, member.pos))))
       case (acc, membersSelect.PolyMethodBinding(member, polyType)) =>
         val knds = kindProvider(member)
         acc.addPolyMembers( knds.ids.toSeq.map(id => id -> new PolyDagNodeFactory(Kind(id, knds.scope), Some(exprNm), member, polyType, kindProvider ) ))
@@ -39,7 +48,7 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
     val allMappings = membersMapping.addMember(exprDag.value.kind.id, exprDag)
 
-    ProvidersMap(allMappings.members, allMappings.polyMembers)
+    MProvidersMap(allMappings.members, allMappings.polyMembers)
   }
 
   def instantiateObjectTree[T](id: Id,

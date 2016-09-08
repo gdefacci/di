@@ -33,7 +33,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
       }
       Leaf[DagNodeOrRef](Ref(Kind(knd.ids.head, knd.scope), par.info, par.pos))
     })
-
+    
   def methodDag(container: Dag[DagNodeOrRef],
                 containerTermName: TermName,
                 method: Symbol,
@@ -48,7 +48,6 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
   def constructorDag(knd:Kind,
                      exprType:Type,
                      constructorMethod:MethodSymbol,
-                     mappings: Providers[DagNodeOrRef],
                      kindProvider: Symbol => Kinds,
                      members:Seq[Tree]): Dag[DagNodeOrRef] = {
     val typ = constructorMethod.owner

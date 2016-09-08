@@ -82,19 +82,12 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
           Some(WithQualifier(name.decodedName.toString, parsMap.toMap))
       }
     } else {
-      //        val itemType = typeOf[org.obl.di.Item[_]]
-      ////        context.warning(annotation.tree.pos, "annotation  =" + annotation.tree.children.mkString(" -- "))
-      //        if (annotation.tree.tpe <:< itemType){
-      //          context.warning(annotation.tree.pos, "annotation  =" + annotation.tree.tpe.typeArgs.mkString(", "))
-      //        }
-
       None
     }
   }
 
   private def annotationScope(annotation: Annotation): Option[DagScope] = {
       if (annotation.tree.tpe =:= javaxInjectSingleton) {
-        //context.warning(annotation.tree.pos, "SingletonScope --")
         Some(SingletonScope)
       } else
         None

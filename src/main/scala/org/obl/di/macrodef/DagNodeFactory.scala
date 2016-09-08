@@ -11,9 +11,8 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     typ: Type,
     mappings: Providers[DagNodeOrRef],
     kindProvider: Symbol => Kinds): Dag[DagNode] = {
-
     
-    val mpng = mappings.findMembers(id, (nd) => isSubtype(typ, nd.typ) ) 
+    val mpng = mappings.findMembers(id, (nd) => nd.typ <:< typ ) 
     if (mpng .length > 1) context.abort(context.enclosingPosition, s"more than one instance for $id $typ ${mpng.mkString(", ")}")
     mpng.headOption.map { dg =>
       val dags: Seq[Dag[DagNode]] = toDagNodes(mappings, kindProvider)
@@ -25,7 +24,7 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
         val constructorMethod = membersSelect.getPrimaryConstructor(typ).getOrElse {
           context.abort(context.enclosingPosition, s"cant find primary constructor for ${typ.typeSymbol.fullName}")
         }
-        dagNodeOrRefToDagNode(constructorDag(Kind.derived, typ, constructorMethod, mappings, kindProvider, Nil), mappings, kindProvider)
+        dagNodeOrRefToDagNode(constructorDag(Kind.derived, typ, constructorMethod, kindProvider, Nil), mappings, kindProvider)
 
       } else {
         implementsAbstractType(typ, mappings, kindProvider)
@@ -54,9 +53,10 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     }
   }
   
-  private def isSubtype(sup:Type, sub:Type) = {
-    sub <:< sup || sub.typeSymbol.asType.toType <:< sup 
-  }
+//  private def isSubtype(sup:Type, sub:Type) = {
+////    sub <:< sup || sub.typeSymbol.asType.toType <:< sup 
+//    sub <:< sup  
+//  }
   
   private def refToDagNode(ref: Ref,
     mappings: Providers[DagNodeOrRef],
@@ -67,15 +67,15 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     val typSymbol = typ.typeSymbol
     membersSelect.multiTargetItem(typ) match {
       case None =>
-        val typMappings = mappings.findMembers(ref.kind.id, { (nd) => nd != ref && isSubtype(typ, nd.typ) }).map { dg =>
-          dagNodeOrRefToDagNode(dg, mappings, kindProvider)  
-        }
-        if (typMappings.length == 1) typMappings.head 
+        // FIXME cycles should be handled properly
+        val typMappings = mappings.findMembers(ref.kind.id, { nd => nd != ref && nd.typ <:< typ })
+//        .map { dg =>
+//          dagNodeOrRefToDagNode(dg, mappings, kindProvider)  
+//        }
+        if (typMappings.length == 1) dagNodeOrRefToDagNode(typMappings.head, mappings, kindProvider)
         else if (typMappings.length == 0) {
           
           val polyMembers = mappings.findPolymorphicMembers(ref.kind.id, df => df.apply(typ))
-          
-          context.warning(context.enclosingPosition, ">>" + polyMembers.mkString(", "))
           
           if (polyMembers.length > 1) context.abort(context.enclosingPosition, s"found more than a polymorphic factory for ${typSymbol.fullName}")
           else if (polyMembers.length == 1) {
@@ -86,20 +86,22 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
             val constructorMethod = membersSelect.getPrimaryConstructor(typ).getOrElse {
               context.abort(context.enclosingPosition, s"cant find primary constructor for ${typSymbol.fullName}")
             }
-            val dnd = constructorDag(Kind.derived, typ, constructorMethod, mappings, kindProvider, Nil)
-            val nmappings = dnd.value match {
-              case dn:DagNode => Map((dn.kind.id -> typSymbol) -> dnd)
-              case _ => Map.empty
-            }
-            dagNodeOrRefToDagNode(dnd, mappings, kindProvider)
+            val dnd = constructorDag(ref.kind, typ, constructorMethod, kindProvider, Nil)
+            val r = dagNodeOrRefToDagNode(dnd, mappings, kindProvider)
+            
+//            if (!mappings.replaceMember(r.value.kind.id, nd => nd.value == ref, r)) {
+//              context.warning(context.enclosingPosition, r.value.toString)        
+//            }
+            
+            r
           }
-        } else
-          context.abort(ref.sourcePos, s"more than 1 instance available for ${typ} with id ${ref.kind.id} ${typMappings.map(_.value).mkString(", ")}")
-    
+        } else {
+          context.abort(context.enclosingPosition, s"more than 1 instance available for ${typ} with id ${ref.kind.id} ${typMappings.map(_.value).mkString(", ")}")
+        }
       case Some(itemType) => 
         // FIXME cycles should be handled properly
         val insts:Seq[Dag[DagNodeOrRef]] = mappings.findMembers(ref.kind.id, (nd) => 
-          nd != ref && isSubtype(itemType, nd.typ) 
+          nd != ref && (nd.typ <:< itemType)  
         )
         val nd = DagNode(Kind.default, s"allBindings$itemType", 
             inps => Nil, 
@@ -115,7 +117,7 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     mappings.members.foldLeft(z) { (acc, dagOrRef) =>
       val (mappings, resSeq) = acc
         val dn: Dag[DagNode] = dagNodeOrRefToDagNode(dagOrRef, mappings, kindProvider)
-        val nmapings = mappings + (dn.value.kind.id  -> dn)
+        val nmapings = mappings //+ (dn.value.kind.id  -> dn)
         val nres = resSeq :+ dn
         
         nmapings -> nres
@@ -135,7 +137,7 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
     primaryConstructor.fold(
         valueDag[DagNode](Nil, reflectUtils.newTrait(typ.typeSymbol, members), Kind.default)
       )(constr =>
-        dagNodeOrRefToDagNode(constructorDag(Kind.derived, typ, constr, mappings, kindProvider, members), mappings, kindProvider)
+        dagNodeOrRefToDagNode(constructorDag(Kind.derived, typ, constr, kindProvider, members), mappings, kindProvider)
       )
   }
 
@@ -162,7 +164,8 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
         knd.ids.map(id => id -> parameterDag(par, Kind(id, knd.scope)))
       }
     }
-    val mappings: Providers[DagNodeOrRef] = initMappings ++ parametersBindings
+    val mappings: Providers[DagNodeOrRef] = initMappings.copy() 
+    mappings ++= parametersBindings
     MemberDagInfo(
       m.name,
       paramss = m.paramLists,

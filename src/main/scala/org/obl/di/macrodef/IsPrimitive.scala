@@ -6,14 +6,19 @@ private[di] class IsPrimitive[C <: Context](val context:C) {
   
   import context.universe._
   
-  val boolean = typeOf[Boolean]
-  val double = typeOf[Double]
-  val string = typeOf[String]
+  val TInt = typeOf[Int]
+  val TByte = typeOf[Byte]
+  val TShort = typeOf[Short]
+  val TBoolean = typeOf[Boolean]
+  val TDouble = typeOf[Double]
+  val TFloat = typeOf[Float]
+  val TString = typeOf[String]
   
   def apply(typ:Type):Boolean = {
-    val r = typ <:< boolean || typ.weak_<:<(double) || typ <:< string
-//    if (r) context.warning(context.enclosingPosition, s"$typ <:< boolean $r")
-    r
+    typ match {
+      case x if x <:< TInt || x <:<  TString || x <:<  TBoolean || x <:< TByte || x <:<  TDouble || x <:<  TFloat || x <:<  TShort => true
+      case _ => false
+    }
   }
   
 }

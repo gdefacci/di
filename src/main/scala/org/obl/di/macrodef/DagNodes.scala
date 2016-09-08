@@ -26,6 +26,8 @@ private[di] trait DagNodes[C <: Context] {
   sealed case class Ref(val kind: Kind, val typ: Type, val sourcePos: Position) extends DagNodeOrRef {
     assert(typ != null)
     def description: String = s"Reference to type $typ"
+    
+//    context.warning(sourcePos, "Ref:"+typ.toString)
   }
 
   sealed abstract case class DagNode(id: Int) extends DagNodeOrRef {
@@ -102,7 +104,7 @@ ${dupEntry}
     context.abort(context.enclosingPosition, text)
   }
 
-  type Providers[T] = ProvidersMap[Id, T, DagNodeDagFactory]
+  type Providers[T] = MProvidersMap[Id, T, DagNodeDagFactory]
 
   trait DagNodeDagFactory {
 
@@ -160,7 +162,8 @@ ${dupEntry}
             if (parKnd.ids.size > 1) {
               context.abort(par.pos, "parameters must have at most one identifier annotation")
             }
-            Leaf[DagNodeOrRef](Ref(Kind(parKnd.ids.head, parKnd.scope), par.info.substituteTypes(tpKeys, tpVals), par.pos))
+            val parTyp = par.info.substituteTypes(tpKeys, tpVals)
+            Leaf[DagNodeOrRef](Ref(Kind(parKnd.ids.head, parKnd.scope), parTyp, par.pos))
           })
 
           val mRetType = polyType.resultType.substituteTypes(tpKeys, tpVals)
