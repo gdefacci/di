@@ -13,9 +13,6 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     def addPolyMembers(ms: Seq[(Id, DagNodeDagFactory)]) = copy(polyMembers = polyMembers ++ ms)
   }
   
-  def findRefs(dg:Dag[DagNodeOrRef]) =
-    Dag.visit(dg).collect { case Leaf(r:Ref) => r }
-
   def toDagNodesWithRefs(valueExpr: context.Expr[_], kindProvider: Symbol => Kinds): Providers[DagNodeOrRef] = {
     val exprTyp = valueExpr.actualType
     val exprNm = TermName(context.freshName(exprTyp.typeSymbol.name.decodedName.toString))
@@ -29,11 +26,6 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
           case dg @ Node(dn: DagNode, _) => (dn.kind.id -> dg) :: Nil
           case _ => Nil
         }
-//        dgs.foreach { case (id, dg) =>
-//          findRefs(dg).foreach { rf =>
-//            context.warning(rf.sourcePos, rf.typ.toString)  
-//          }
-//        }
         acc.addMembers(dgs)
       case (acc, membersSelect.BindInstance(member, abstractType, concreteType)) =>
         val knds = kindProvider(member)

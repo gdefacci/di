@@ -177,6 +177,21 @@ class ConstructorTests extends FunSuite {
     assert(seq2.toSet == Set(NMod1.i1, NMod2.i1))
 
   }
+  
+  test("multi bind") {
+
+    import MultiModule._
+    val traits1 = IOC.get[Seq[Trait1]](NModBind)
+    assert(traits1.size == 2)
+    assert(traits1.exists {
+      case _:Trait1ImplA => true
+      case _=> false
+    })
+    assert(traits1.exists {
+      case _:Trait1ImplB => true
+      case _=> false
+    })
+  }
 
   test("class declarations in modules") {
 

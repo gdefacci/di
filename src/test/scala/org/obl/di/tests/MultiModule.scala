@@ -2,6 +2,7 @@ package org.obl.di.tests
 
 import org.obl.di.runtime.AllBindings
 import javax.inject.Named
+import org.obl.di.runtime.Bind
 
 object MultiModule {
 
@@ -46,5 +47,19 @@ object MultiModule {
 
     def i455 = 3343
   }
+  
+  sealed trait Trait1
+  class Trait1ImplA extends Trait1
+  class Trait1ImplB extends Trait1
+  
+  object NModBind {
+    
+    val bindA = Bind[Trait1, Trait1ImplA]
+    val bindB = Bind[Trait1, Trait1ImplB]
+
+    def allTrait1(sq1: AllBindings[Trait1]):Seq[Trait1] = sq1.values
+    
+  }
+  
 
 }

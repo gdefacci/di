@@ -19,8 +19,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     private def resolveRef(ref: Ref): Dag[DagNode] = {
       val Ref(Kind(id, _), typ, _) = ref
 
-      val rsSub = dagProviders.find(id, nd => nd.value.typ <:< typ)
-      val rs = rsSub.filter(nd => nd.value != ref)
+      val rs = dagProviders.find(id, nd => nd.value != ref && nd.value.typ <:< typ)
       rs match {
         case Seq() =>
           val r = membersSelect.multiTargetItem(typ) match {
@@ -49,57 +48,6 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         resolveDagNode(nd, inputs)
     }
 
-//    private def resolveRef(ref: Ref): Dag[DagNode] = {
-//      val Ref(Kind(id, _), typ, _) = ref
-//
-////      val rsSub = dagProviders.find(id, nd => nd.value.typ <:< typ)
-////      val rs = rsSub.filter(nd => nd.value != ref)
-////      rs match {
-////        case Seq() =>
-//          membersSelect.multiTargetItem(typ) match {
-//
-//            case Some(itemType) =>
-//              resolveMultiTargetRef(ref, itemType)
-//
-//            case None =>
-//              resolveTargetRef(ref)
-//
-//          }
-////        case Seq(hd) =>
-////          hd
-////        case items =>
-////          context.abort(context.enclosingPosition, s"more than 1 instance available for ${typ} with id ${ref.kind.id} ${items.map(_.value).mkString(", ")}")
-////      }
-//    }
-//
-//    
-//    def resolveDagNodeOrRef(nd: DagNodeOrRef, inputs: Seq[Dag[DagNodeOrRef]]): Dag[DagNode] = {
-//      val id = nd.kind.id
-//      val typ = nd.typ
-//      val rs = dagProviders.find(id, nd => nd.value.typ <:< typ)
-//      val isRef = nd match {
-//        case _:Ref => true
-//        case _ => false
-//      }
-//      val r = rs match {
-//        case Seq(hd) if (isRef && hd != nd) || ! isRef =>
-//          hd
-//        case Seq() | Seq(_) =>
-//          val r = nd match {
-//            case ref @ Ref(_, _, _) =>
-//              assert(inputs.isEmpty, "refs must have no inputs")
-//              resolveRef(ref)
-//            case nd: DagNode =>
-//              resolveDagNode(nd, inputs)
-//          }
-//          r
-//        case items =>
-//          context.abort(context.enclosingPosition, s"more than 1 instance available for ${typ} with id ${nd.kind.id} ${items.map(_.value).mkString(", ")}")
-//      }
-//      if (dagProviders.find(id, nd => nd.value.typ <:< typ).isEmpty) dagProviders += (id, r)
-//      r
-//    } 
-      
     private def resolveTargetRef(ref: Ref) = {
       val Ref(Kind(id, _), typ, pos) = ref
       val typMappings = mappings.findMembers(id, { nd => nd != ref && nd.typ <:< typ })

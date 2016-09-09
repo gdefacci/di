@@ -55,7 +55,7 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
 
   private def annotationStringAttribute(annotation: Annotation, attr: String): Option[String] = {
     annotation.tree.children.tail.collectFirst {
-      case arg@AssignOrNamedArg(id: Ident, Literal(Constant(v: String))) if id.name.decodedName.toString == attr =>
+      case arg @ AssignOrNamedArg(id: Ident, Literal(Constant(v: String))) if id.name.decodedName.toString == attr =>
         v
     }
   }
@@ -87,12 +87,12 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
   }
 
   private def annotationScope(annotation: Annotation): Option[DagScope] = {
-      if (annotation.tree.tpe =:= javaxInjectSingleton) {
-        Some(SingletonScope)
-      } else
-        None
+    if (annotation.tree.tpe =:= javaxInjectSingleton) {
+      Some(SingletonScope)
+    } else
+      None
   }
-  
+
   def apply(sym: context.Symbol): Kinds = {
     Option(sym).map { sym =>
 
@@ -103,17 +103,17 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
         sym.annotations
       } else
         Nil
-        
-      val z:(Set[Id], Option[DagScope], Option[Boolean]) = (Set.empty, None, None)  
+
+      val z: (Set[Id], Option[DagScope], Option[Boolean]) = (Set.empty, None, None)
       val (ids, optScope, isItem) = annotations.foldLeft(z) { (acc, annotation) =>
         val (ids, scope, isItem) = acc
         val nscope = (scope -> annotationScope(annotation)) match {
           case (Some(_), Some(_)) => context.abort(context.enclosingPosition, "more than one scope annotation ")
-          case (x,y) => y.orElse(x)
-        } 
+          case (x, y) => y.orElse(x)
+        }
         ((ids ++ annotationId(annotation).toSet), nscope, isItem)
       }
-      
+
       Kinds(if (ids.nonEmpty) ids else Set(Global), optScope.getOrElse(DefaultScope))
     } getOrElse {
       Kinds.default

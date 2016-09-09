@@ -2,7 +2,7 @@ package org.obl.di.macrodef
 
 object MProvidersMap {
 
-  def empty[KI, T, TF] = new MProvidersMap[KI, T, TF]
+  def empty[KI, T, TF] = new MProvidersMap[KI, T, TF](MapOfBuffers.empty, MapOfBuffers.empty)
 
   def apply[KI, T, TF](mp: Seq[(KI, Dag[T])], polyMembersMap: Seq[(KI, TF)]): MProvidersMap[KI, T, TF] = {
     val res = empty[KI, T, TF]
@@ -20,8 +20,6 @@ object MProvidersMap {
 private[di] class MProvidersMap[KI, T, TF] private ( 
     private val membersMap:MapOfBuffers[KI, Dag[T]],
     private val polyMembersMap:MapOfBuffers[KI, TF]) {
-  
-  def this() = this(new MapOfBuffers[KI, Dag[T]], new MapOfBuffers[KI, TF])
   
   def findMembers(kid: KI, typPredicate: T => Boolean): Seq[Dag[T]] = 
     membersMap.find(kid, (dag) => typPredicate(dag.value))
@@ -41,8 +39,6 @@ private[di] class MProvidersMap[KI, T, TF] private (
     membersMap ++= e.membersMap
     polyMembersMap ++= e.polyMembersMap
   }
-  
-  //def replaceMember(id:KI, what:Dag[T] => Boolean, withDag:Dag[T]) = membersMap.replace(id, what, withDag)
   
   def members: Seq[Dag[T]] = membersMap.values
   def polyMembers: Seq[TF] = polyMembersMap.values
