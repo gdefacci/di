@@ -162,6 +162,9 @@ ${dupEntry}
             if (parKnd.ids.size > 1) {
               context.abort(par.pos, "parameters must have at most one identifier annotation")
             }
+            if (parKnd.scope != DefaultScope) {
+              context.abort(par.pos, "parameters cant have scope annotations")
+            }
             val parTyp = par.info.substituteTypes(tpKeys, tpVals)
             Leaf[DagNodeOrRef](Ref(Kind(parKnd.ids.head, parKnd.scope), parTyp, par.pos))
           })

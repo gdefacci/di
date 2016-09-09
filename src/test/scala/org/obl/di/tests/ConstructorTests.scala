@@ -157,10 +157,9 @@ class ConstructorTests extends FunSuite {
   test("singleton bind") {
     import samples2._
 
-    val service = IOC.getSource[Service2](module7, module3)
+    val service = IOC.get[Service2](module7, module3)
 
-    
-    println(service)
+    assert(service.service.repository == service.service1.repository)
   }
   
   test("multi integers") {

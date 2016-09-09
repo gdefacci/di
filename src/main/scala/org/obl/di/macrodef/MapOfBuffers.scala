@@ -2,6 +2,10 @@ package org.obl.di.macrodef
 
 import collection.mutable.Buffer
 
+object MapOfBuffers {
+  def empty[K,V] = new MapOfBuffers[K,V](collection.mutable.Map.empty)
+}
+
 class MapOfBuffers[K,V] private ( private val state:collection.mutable.Map[K, Buffer[V]] ) {
   
   def this() = this(collection.mutable.Map.empty[K, Buffer[V]])
@@ -23,17 +27,17 @@ class MapOfBuffers[K,V] private ( private val state:collection.mutable.Map[K, Bu
     case (k, vs) => this ++= (k,vs)
   }
   
-  def replace(id:K, what:V => Boolean, withValue:V):Boolean = 
-    state.get(id).map { buff =>
-      var found = false
-      buff.map {
-        case x if what(x) => 
-          found = true
-          withValue
-        case x => x
-      }
-      found
-    }.getOrElse(false)
+//  def replace(id:K, what:V => Boolean, withValue:V):Boolean = 
+//    state.get(id).map { buff =>
+//      var found = false
+//      buff.map {
+//        case x if what(x) => 
+//          found = true
+//          withValue
+//        case x => x
+//      }
+//      found
+//    }.getOrElse(false)
   
   def copy():MapOfBuffers[K,V] = {
     val mp1 = collection.mutable.Map.empty[K, Buffer[V]]

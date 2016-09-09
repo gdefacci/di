@@ -3,7 +3,7 @@ package org.obl.di.macrodef
 import language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 
-private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with DagNodeOrRefFactory[C] with DagNodeFactory[C] with DagToExpr[C] {
+private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with TypeResolverMixin[C] with DagNodeOrRefFactory[C] with DagNodeFactory[C] with DagToExpr[C] {
 
   import context.universe._
 
