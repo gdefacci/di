@@ -1,6 +1,6 @@
 package org.obl.di.macrodef
 
-object MProvidersMap {
+private[di] object MProvidersMap {
 
   def empty[KI, T, TF] = new MProvidersMap[KI, T, TF](MapOfBuffers.empty, MapOfBuffers.empty)
 

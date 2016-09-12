@@ -37,6 +37,11 @@ private[di] class MembersSelect[C <: Context](val context: C) {
     case t @ PolyType(_, _) => Some(t)
     case _ => None
   }
+    
+  def getPolyType(m: Type):Option[PolyType] = m match {
+    case t @ PolyType(_, _) => Some(t)
+    case _ => None
+  }
 
   def getBindings[T](t: context.universe.Type):Seq[Binding]  = {
     

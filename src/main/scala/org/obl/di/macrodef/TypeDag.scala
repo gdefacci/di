@@ -18,8 +18,7 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     val exprNm = TermName(context.freshName(exprTyp.typeSymbol.name.decodedName.toString))
     val exprDag = alias(exprNm, valueExpr.tree, Kind.default)
 
-    val z = ModuleMappings(Nil, Nil)
-    val membersMapping = membersSelect.getBindings(exprTyp).foldLeft(z) {
+    val membersMapping = membersSelect.getBindings(exprTyp).foldLeft(ModuleMappings(Nil, Nil)) {
       case (acc, membersSelect.MethodBinding(member)) =>
         val dgs = methodDag(exprDag, exprNm, member, kindProvider).toSeq.flatMap {
           case dg @ Leaf(dn: DagNode) => (dn.kind.id -> dg) :: Nil
@@ -66,14 +65,14 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     }
 
     val dagExpr = dagToExpr(dag1)
-    dagExpr.toTree
+    context.typecheck(dagExpr.toTree)
   }
 
   def instantiateObject[T](id: Id,
     typ: Type,
     mappings: Providers[DagNodeOrRef],
     kindProvider: Symbol => Kinds): Expr[T] = {
-    context.Expr[T](context.typecheck(instantiateObjectTree(id, typ, mappings, kindProvider)))
+    context.Expr[T](instantiateObjectTree(id, typ, mappings, kindProvider))
   }
 
 }

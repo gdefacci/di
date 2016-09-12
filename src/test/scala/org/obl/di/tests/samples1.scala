@@ -61,4 +61,17 @@ object samples1 {
     
   }
   
+  object ModImplicit1 {
+    
+    val a:Int = 1
+    val s:Boolean = true
+    
+    def toText(a:Int)(implicit b:Boolean):String = a + b.toString
+    
+  }
+  
+  class ClImplcit(a:Int)(implicit b:Boolean, txt:String) {
+    def text = txt + a + b 
+  }
+  
 }

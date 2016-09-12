@@ -48,7 +48,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         resolveDagNode(nd, inputs)
     }
 
-    private def resolveTargetRef(ref: Ref) = {
+    private def resolveTargetRef(ref: Ref): Dag[DagNode] = {
       val Ref(Kind(id, _), typ, pos) = ref
       val typMappings = mappings.findMembers(id, { nd => nd != ref && nd.typ <:< typ })
       typMappings match {
@@ -60,8 +60,15 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
               val constructorMethod = membersSelect.getPrimaryConstructor(typ).getOrElse {
                 context.abort(context.enclosingPosition, s"cant find primary constructor for ${typ.typeSymbol.fullName}")
               }
-              val dnd = constructorDag(ref.kind, typ, constructorMethod, kindProvider, Nil)
-              resolveDagNodeOrRef(dnd.value, dnd.inputs)
+              membersSelect.getPolyType(constructorMethod.returnType.etaExpand).map { polyType =>
+                val dg = new PolyDagNodeFactory(ref.kind, None, constructorMethod, polyType, kindProvider).apply(ref.typ).getOrElse {
+                  context.abort(context.enclosingPosition, s"error creating dag for polymorpic primary constructor for ${typ.typeSymbol.fullName}")
+                }
+                resolveDagNodeOrRef(dg.value, dg.inputs)
+              }.getOrElse {
+                val dnd = constructorDag(ref.kind, typ, constructorMethod, kindProvider, Nil)
+                resolveDagNodeOrRef(dnd.value, dnd.inputs)
+              }
             case Seq(dag) =>
               resolveDagNodeOrRef(dag.value, dag.inputs)
             case _ =>
@@ -74,7 +81,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       }
     }
 
-    private def resolveMultiTargetRef(ref:Ref, itemType:Type) = {
+    private def resolveMultiTargetRef(ref: Ref, itemType: Type) = {
       val Ref(Kind(id, _), typ, pos) = ref
       val insts: Seq[Dag[DagNodeOrRef]] = mappings.findMembers(id, (nd) => nd != ref && nd.typ <:< itemType)
 

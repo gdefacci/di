@@ -223,5 +223,34 @@ class ConstructorTests extends FunSuite {
     assert(Pippo("Pippy", 27) == p2)
 
   }
+  
+  test("provider with implicit param") {
+    import samples1._
+
+    val txt = IOC.get[String](ModImplicit1)
+    
+    assert(txt == "1true")
+  }
+  
+ test("class with implicit param") {
+    import samples1._
+
+    val txt = IOC.get[ClImplcit](ModImplicit1).text
+    
+    assert(txt == "1true1true")
+  }
+ 
+ test("polimorphic constructor") {
+   import samples1._
+
+   val mod = new Cl1A
+   val (i,txt,b) = IOC.get[(Int,String,Boolean)](mod)
+   println( IOC.getSource[(Int,String,Boolean)](mod) )
+
+   assert(b == mod.f)
+   assert(txt == mod.h)
+   assert(i == 1333)
+   
+ }
 
 }
