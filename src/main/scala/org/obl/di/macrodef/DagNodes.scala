@@ -38,7 +38,7 @@ private[di] trait DagNodes[C <: Context] {
 
   object DagNode {
 
-    private final class DagNodeImpl(val kind: Kind,
+    private final class DagNodeImpl private[DagNode] (val kind: Kind,
         val description: String,
         val initialization: Seq[Tree] => Seq[Tree],
         val invoker: Seq[Tree] => Tree,
@@ -77,31 +77,15 @@ private[di] trait DagNodes[C <: Context] {
         method.name.decodedName.toString)
     }
 
-    def constructorCall(kind: Kind, containerTermName: Option[TermName], typ: Type, constructor: MethodSymbol, members: Seq[Tree]): DagNode = {
+    def constructorCall(kind: Kind, typ: Type, constructor: MethodSymbol, members: Seq[Tree]): DagNode = {
       val invoker: Seq[Tree] => Tree = if (members.isEmpty) { inputs =>
-        reflectUtils.methodCall(containerTermName, constructor, inputs)
+        reflectUtils.methodCall(None, constructor, inputs)
       } else { inputs =>
         reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, inputs, members)
       }
       apply(kind, s"$constructor", trees => Nil, invoker, typ, constructor.pos, typ.typeSymbol.name.decodedName.toString)
     }
 
-  }
-
-  private def reportDuplicateMapping[T](id: Id, typeSymbol: Symbol, dags: Seq[Dag[T]]): Nothing = {
-    val text =
-      s"""
-duplicates bindings: ${dags.length}
-type ${typeSymbol} ${id} has more than one binding
-${
-        dags.map { dupEntry =>
-          s"""
-${dupEntry}
-"""
-        }.mkString("")
-      }
-"""
-    context.abort(context.enclosingPosition, text)
   }
 
   type Providers[T] = MProvidersMap[Id, T, DagNodeDagFactory]
@@ -176,7 +160,7 @@ ${dupEntry}
               s"$method[${substTypes.mkString(", ")}]",
               initialization = _ => Nil,
               invoker = { args => reflectUtils.methodCall(containerTermName, method, substTypes, args) },
-              mRetType,
+              concreteType,
               method.pos,
               method.name.decodedName.toString),
             dagInputs)

@@ -74,5 +74,37 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     kindProvider: Symbol => Kinds): Expr[T] = {
     context.Expr[T](instantiateObjectTree(id, typ, mappings, kindProvider))
   }
+  
+  import org.obl.di.graph
 
+  def graphModel(id: Id,
+    typ: Type,
+    mappings: Providers[DagNodeOrRef],
+    kindProvider: Symbol => Kinds): Tree = {
+    val dag = instantiateDag(id, typ, mappings, kindProvider)
+    val graphNodes = Dag.visit(dag).map(toDependencyTree)
+    context.typecheck( q"List(..$graphNodes)" )
+  }
+
+  def toDependencyTree(dag:Dag[DagNode]) = {
+    val node = dag.value
+    implicit val dagScopeLiftable = new Liftable[DagScope] {
+      def apply(value: DagScope): Tree = value match {
+        case SingletonScope => q"org.obl.di.graph.DependencyScope.Singleton"
+        case DefaultScope => q"org.obl.di.graph.DependencyScope.Factory"
+      }
+    }
+    
+    q"""
+    org.obl.di.graph.Dependency(
+        org.obl.di.graph.DependencyId(${node.id}), 
+        ${node.kind.scope}, 
+        org.obl.di.graph.TypeValue(${node.typ.toString}), 
+        org.obl.di.graph.FilePosition(${node.sourcePos.source.file.path}, ${node.sourcePos.line}), 
+        List(..${dag.inputs.map( i => q"org.obl.di.graph.DependencyId(${i.value.id})" ) }) )
+    """
+  }
+
+  
+  
 }

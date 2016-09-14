@@ -9,9 +9,6 @@ object IOCMacro {
 
     val td = new TypeDag[c.type](c)
 
-//    val mappings = modules.foldLeft(ProvidersMap.empty[Id, td.DagNodeOrRef, td.DagNodeDagFactory]) { (mappings, o) =>
-//      mappings ++ td.toDagNodesWithRefs(o, kindProvider.apply)
-//    }
     val mappings = MProvidersMap.empty[Id, td.DagNodeOrRef, td.DagNodeDagFactory]
     modules.foreach { module =>
       mappings ++= td.toDagNodesWithRefs(module, kindProvider.apply)
@@ -19,15 +16,25 @@ object IOCMacro {
     
     td.instantiateObject(Global, c.universe.weakTypeOf[T], mappings, kindProvider.apply)
   }
+  
+  def graph[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Expr[T] = {
+    val kindProvider = new DefaultKindProvider[c.type](c)
+
+    val td = new TypeDag[c.type](c)
+
+    val mappings = MProvidersMap.empty[Id, td.DagNodeOrRef, td.DagNodeDagFactory]
+    modules.foreach { module =>
+      mappings ++= td.toDagNodesWithRefs(module, kindProvider.apply)
+    }
+    
+    c.Expr( td.graphModel(Global, c.universe.weakTypeOf[T], mappings, kindProvider.apply) )
+  }
 
   def getSource[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Expr[String] = {
     import c.universe._
     val kindProvider = new DefaultKindProvider[c.type](c)
 
     val td = new TypeDag[c.type](c)
-//    val mappings = modules.foldLeft(ProvidersMap.empty[Id, td.DagNodeOrRef, td.DagNodeDagFactory]) { (mappings, o) =>
-//      mappings ++= td.toDagNodesWithRefs(o, kindProvider.apply)
-//    }
     val mappings = MProvidersMap.empty[Id, td.DagNodeOrRef, td.DagNodeDagFactory]
     modules.foreach { module =>
       mappings ++= td.toDagNodesWithRefs(module, kindProvider.apply)

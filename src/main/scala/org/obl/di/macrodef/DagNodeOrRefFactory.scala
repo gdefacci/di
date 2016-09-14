@@ -56,7 +56,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     }
     val parametersDags: Seq[Dag[DagNodeOrRef]] = paramListsDags(constructorMethod.paramLists, kindProvider)
     assert(parametersDags.length == constructorMethod.paramLists.map(_.length).sum)
-    Node[DagNodeOrRef](DagNode.constructorCall(knd, None, exprType, constructorMethod, members), parametersDags)
+    Node[DagNodeOrRef](DagNode.constructorCall(knd, exprType, constructorMethod, members), parametersDags)
   }
 
   def parameterDag(par:Symbol, knd:Kind): Dag[DagNodeOrRef]  =
