@@ -31,14 +31,28 @@ private[di] trait DagNodes[C <: Context] {
   }
 
   sealed abstract case class DagNode(id: Int) extends DagNodeOrRef {
+    def providerSource:ProviderSource
     def singletonName: TermName
     def invoke(inputs: Seq[Tree]): Tree
     def initialization: Seq[Tree] => Seq[Tree]
   }
+  
+  sealed trait ProviderSource
+  
+  object ProviderSource {
+    
+    case class MethodSource(method:MethodSymbol) extends ProviderSource
+    case class ConstructorSource(method:MethodSymbol) extends ProviderSource
+    case object ValueSource extends ProviderSource
+    case class AllbindingsSource(itemType:TypeSymbol) extends ProviderSource
+  }
+  
 
   object DagNode {
 
-    private final class DagNodeImpl private[DagNode] (val kind: Kind,
+    private final class DagNodeImpl private[DagNode] (
+        lazyProviderSource: => ProviderSource,
+        val kind: Kind,
         val description: String,
         val initialization: Seq[Tree] => Seq[Tree],
         val invoker: Seq[Tree] => Tree,
@@ -51,25 +65,30 @@ private[di] trait DagNodes[C <: Context] {
       def invoke(inputs: Seq[Tree]): Tree = invoker(inputs)
       lazy val singletonName = TermName(context.freshName(s"${baseName}Singleton"))
 
+      lazy val providerSource = lazyProviderSource
     }
 
-    def apply(kind: Kind,
+    def apply(
+        providerSource:ProviderSource,
+        kind: Kind,
       description: String,
       initialization: Seq[Tree] => Seq[Tree],
       invoker: Seq[Tree] => Tree,
       typ: Type,
       sourcePos: Position,
       baseName: => String): DagNode = {
-      new DagNodeImpl(kind, description, initialization, invoker, typ, sourcePos, baseName)
+      new DagNodeImpl(providerSource, kind, description, initialization, invoker, typ, sourcePos, baseName)
     }
 
     def value(kind: Kind, initialization: Seq[Tree], value: Tree, typ: Type, sourcePos: Position) = {
-      apply(kind, s"$value", trees => initialization, (trees) => value, typ, sourcePos, typ.typeSymbol.name.decodedName.toString)
+      apply(ProviderSource.ValueSource, 
+          kind, s"$value", trees => initialization, (trees) => value, typ, sourcePos, typ.typeSymbol.name.decodedName.toString)
     }
 
     def methodCall(kind: Kind, containerTermName: Option[TermName], method: Symbol) = {
       lazy val methodSymbol = method.asMethod
-      apply(kind,
+      apply(new ProviderSource.MethodSource(method.asMethod),
+        kind,
         s"$method", trees => Nil,
         inputs => reflectUtils.methodCall(containerTermName, methodSymbol, inputs),
         typ = methodSymbol.returnType,
@@ -83,7 +102,8 @@ private[di] trait DagNodes[C <: Context] {
       } else { inputs =>
         reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, inputs, members)
       }
-      apply(kind, s"$constructor", trees => Nil, invoker, typ, constructor.pos, typ.typeSymbol.name.decodedName.toString)
+      apply(new ProviderSource.ConstructorSource(constructor),
+          kind, s"$constructor", trees => Nil, invoker, typ, constructor.pos, typ.typeSymbol.name.decodedName.toString)
     }
 
   }
@@ -156,7 +176,9 @@ private[di] trait DagNodes[C <: Context] {
           val mRetType = polyType.resultType.substituteTypes(tpKeys, tpVals)
 
           Node[DagNodeOrRef](
-            DagNode(kind,
+            DagNode(
+                new ProviderSource.MethodSource(method),
+                kind,
               s"$method[${substTypes.mkString(", ")}]",
               initialization = _ => Nil,
               invoker = { args => reflectUtils.methodCall(containerTermName, method, substTypes, args) },

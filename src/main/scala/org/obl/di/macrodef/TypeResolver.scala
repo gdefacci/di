@@ -85,7 +85,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       val Ref(Kind(id, _), typ, pos) = ref
       val insts: Seq[Dag[DagNodeOrRef]] = mappings.findMembers(id, (nd) => nd != ref && nd.typ <:< itemType)
 
-      val nd = DagNode(Kind.default, s"allBindings$itemType",
+      val nd = DagNode(new ProviderSource.AllbindingsSource(itemType.typeSymbol.asType), Kind.default, s"allBindings$itemType",
         inps => Nil,
         inps => q"new org.obl.di.runtime.AllBindings[$itemType]( List[$itemType](..$inps) )",
         typ, pos, s"AllBindings_$itemType")

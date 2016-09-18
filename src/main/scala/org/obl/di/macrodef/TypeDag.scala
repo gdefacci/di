@@ -52,7 +52,8 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
       val v1 =
         if (v.kind.scope != SingletonScope) v
         else
-          DagNode(v.kind,
+          DagNode(v.providerSource,
+              v.kind,
             s"singleton${v.description}}",
             inps => Seq(q"""
                 val ${v.singletonName} = ${v.invoke(inps)}
@@ -86,25 +87,39 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     context.typecheck( q"List(..$graphNodes)" )
   }
 
+  
+  def toGraphType(typ:Type):Tree = typ.typeArgs match {
+    case Seq() => q"org.obl.di.graph.TypeValue(${typ.typeSymbol.fullName.toString})"
+    case args => 
+      val typeArgs = args.map(toGraphType(_))
+      q"org.obl.di.graph.PolymorphicType(${typ.erasure.typeSymbol.fullName}, List(..$typeArgs))"
+  }
+  
   def toDependencyTree(dag:Dag[DagNode]) = {
     val node = dag.value
-    implicit val dagScopeLiftable = new Liftable[DagScope] {
-      def apply(value: DagScope): Tree = value match {
-        case SingletonScope => q"org.obl.di.graph.DependencyScope.Singleton"
-        case DefaultScope => q"org.obl.di.graph.DependencyScope.Factory"
-      }
+    
+    val graphScope = node.kind.scope match {
+      case SingletonScope => q"org.obl.di.graph.DependencyScope.Singleton"
+      case DefaultScope => q"org.obl.di.graph.DependencyScope.Factory"
+    }
+    val typ = toGraphType(node.typ)
+    
+    val providerSrc = dag.value.providerSource match {
+      case ProviderSource.MethodSource(m) => q"org.obl.di.graph.MethodSource(${m.owner.fullName}, ${m.name.decodedName.toString})"
+      case ProviderSource.ConstructorSource(c) => q"org.obl.di.graph.ConstructorSource(${c.owner.fullName})"
+      case _ => q"org.obl.di.graph.ValueSource"
     }
     
     q"""
     org.obl.di.graph.Dependency(
         org.obl.di.graph.DependencyId(${node.id}), 
-        ${node.kind.scope}, 
-        org.obl.di.graph.TypeValue(${node.typ.toString}), 
+        $providerSrc,
+        $graphScope, 
+        $typ, 
         org.obl.di.graph.FilePosition(${node.sourcePos.source.file.path}, ${node.sourcePos.line}), 
         List(..${dag.inputs.map( i => q"org.obl.di.graph.DependencyId(${i.value.id})" ) }) )
     """
   }
-
   
   
 }
