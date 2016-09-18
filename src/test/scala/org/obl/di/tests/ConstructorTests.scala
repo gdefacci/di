@@ -234,6 +234,14 @@ class ConstructorTests extends FunSuite {
     assert(txt == "1true")
   }
   
+  test("module with super types") {
+    import samples1._
+
+    val txt = IOC.get[String](ModImplicit1Subtyping)
+    
+    assert(txt == "1true")
+  }
+  
  test("class with implicit param") {
     import samples1._
 
@@ -254,4 +262,13 @@ class ConstructorTests extends FunSuite {
    
  }
 
+ test("polimorphic constructor 1") {
+   import samples1._
+
+   val bpc = IOC.get[BibolyClient](ModBipoly, "abba")
+
+   assert(bpc.bi.a == true)
+   assert(bpc.bi.b == "abba")
+   
+ }
 }

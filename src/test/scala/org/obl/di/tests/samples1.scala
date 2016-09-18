@@ -70,8 +70,40 @@ object samples1 {
     
   }
   
+  trait ModImplicit1Mixin1 {
+    
+    val a:Int = 1
+    
+  }
+  
+  trait ModImplicit1Mixin2 {
+    
+    val s:Boolean = true
+    
+  }
+  
+  trait ModImplicit1Mixin3 {
+    
+    def toText(a:Int)(implicit b:Boolean):String = a + b.toString
+    
+  }
+  
+  object ModImplicit1Subtyping extends ModImplicit1Mixin1 with ModImplicit1Mixin2 with ModImplicit1Mixin3
+  
   class ClImplcit(a:Int)(implicit b:Boolean, txt:String) {
     def text = txt + a + b 
+  }
+  
+  case class Bipoly[A,B](a:A, b:B)
+  
+  case class BibolyClient(bi:Bipoly[Boolean,String])
+  
+  object ModBipoly {
+    
+    def boolBipoly(s:String) = Bipoly(true, s)
+    
+    def intBipoly(s:String) = Bipoly(10, s)
+    
   }
   
 }

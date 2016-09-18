@@ -27,6 +27,12 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
         context.abort(context.enclosingPosition, s"more than one instance for $id $typ ${mpng.mkString(", ")}")
     }
   }
+  
+  private def checkIsNotPrimitive(id: Id, typ: Type) = {
+    if (membersSelect.isPrimitive(typ)) {
+      context.abort(context.enclosingPosition, s"could not find a binding for $typ with id $id")
+    }
+  }
 
   private def implementsAbstractType(typ: Type,
     typeResolver: TypeResolver,

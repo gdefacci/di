@@ -8,13 +8,17 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
 
   val membersSelect = new MembersSelect[context.type](context)
 
-  def checkIsNotPrimitive(id: Id, typ: Type) = {
-    if (membersSelect.isPrimitive(typ)) {
-      context.abort(context.enclosingPosition, s"could not find a binding for $typ with id $id")
-    }
-  }
+  class TypeResolver(
+      mappings: Providers[DagNodeOrRef],
+      kindProvider: Symbol => Kinds,
+      dagProviders: MapOfBuffers[Id, Dag[DagNode]]) {
 
-  class TypeResolver(mappings: Providers[DagNodeOrRef], kindProvider: Symbol => Kinds, dagProviders: MapOfBuffers[Id, Dag[DagNode]]) {
+    private val stack = collection.mutable.Queue.empty[DagNodeOrRef]
+
+    private def error(msg: String) = {
+      val stackLog: String = stack.reverse.map(hd => s"resolving ${hd.typ}").mkString("\n")
+      context.abort(context.enclosingPosition, msg + "\n" + stackLog)
+    }
 
     private def resolveRef(ref: Ref): Dag[DagNode] = {
       val Ref(Kind(id, _), typ, _) = ref
@@ -36,16 +40,27 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         case Seq(hd) =>
           hd
         case items =>
-          context.abort(context.enclosingPosition, s"more than 1 instance available for ${typ} with id ${ref.kind.id} ${items.map(_.value).mkString(", ")}")
+          error(s"more than 1 instance available for ${typ} with id ${ref.kind.id} ${items.map(_.value).mkString(", ")}")
       }
     }
 
-    def resolveDagNodeOrRef(nd: DagNodeOrRef, inputs: Seq[Dag[DagNodeOrRef]]): Dag[DagNode] = nd match {
-      case ref @ Ref(_, _, _) =>
-        assert(inputs.isEmpty, "refs must have no inputs")
-        resolveRef(ref)
-      case nd: DagNode =>
-        resolveDagNode(nd, inputs)
+    def resolveDagNodeOrRef(nd: DagNodeOrRef, inputs: Seq[Dag[DagNodeOrRef]]): Dag[DagNode] = {
+      nd match {
+        case ref @ Ref(_, _, _) =>
+          assert(inputs.isEmpty, "refs must have no inputs")
+          resolveRef(ref)
+        case nd: DagNode =>
+          stack.enqueue(nd)
+          val r = resolveDagNode(nd, inputs)
+          stack.dequeue
+          r
+      }
+    }
+
+    private def checkIsNotPrimitive(id: Id, typ: Type) = {
+      if (membersSelect.isPrimitive(typ)) {
+        error(s"could not find a binding for $typ with id $id")
+      }
     }
 
     private def resolveTargetRef(ref: Ref): Dag[DagNode] = {
@@ -58,11 +73,11 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
             case Seq() =>
               checkIsNotPrimitive(id, typ)
               val constructorMethod = membersSelect.getPrimaryConstructor(typ).getOrElse {
-                context.abort(context.enclosingPosition, s"cant find primary constructor for ${typ.typeSymbol.fullName}")
+                error(s"cant find primary constructor for ${typ.typeSymbol.fullName}")
               }
               membersSelect.getPolyType(constructorMethod.returnType.etaExpand).map { polyType =>
                 val dg = new PolyDagNodeFactory(ref.kind, None, constructorMethod, polyType, kindProvider).apply(ref.typ).getOrElse {
-                  context.abort(context.enclosingPosition, s"error creating dag for polymorpic primary constructor for ${typ.typeSymbol.fullName}")
+                  error(s"error creating dag for polymorpic primary constructor for ${typ.typeSymbol.fullName}")
                 }
                 resolveDagNodeOrRef(dg.value, dg.inputs)
               }.getOrElse {
@@ -72,7 +87,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
             case Seq(dag) =>
               resolveDagNodeOrRef(dag.value, dag.inputs)
             case _ =>
-              context.abort(context.enclosingPosition, s"found more than a polymorphic factory for ${typ.typeSymbol.fullName}")
+              error(s"found more than a polymorphic factory for ${typ.typeSymbol.fullName}")
           }
 
         case Seq(dag) =>
