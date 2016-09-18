@@ -220,8 +220,6 @@ class ConstructorTests extends FunSuite {
 
     val p2 = IOC.get[Pippo](ModPolymorphic, false)
 
-     println( IOC.graph[Pippo](ModPolymorphic, false).mkString("\n") )
-
     assert(Pippo("Pippy", 27) == p2)
 
   }

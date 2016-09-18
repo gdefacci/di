@@ -46,34 +46,17 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     typ: Type,
     mappings: Providers[DagNodeOrRef],
     kindProvider: Symbol => Kinds): Tree = {
+    
     val dag = instantiateDag(id, typ, mappings, kindProvider)
-
-    val dag1 = Dag.update(dag) { (v, inps) =>
-      val v1 =
-        if (v.kind.scope != SingletonScope) v
-        else
-          DagNode(v.providerSource,
-              v.kind,
-            s"singleton${v.description}}",
-            inps => Seq(q"""
-                val ${v.singletonName} = ${v.invoke(inps)}
-                """),
-            inps => q"${v.singletonName}",
-            v.typ,
-            v.sourcePos,
-            "singleton")
-      if (inps.isEmpty) Leaf(v1) else Node(v1, inps)
-    }
-
-    val dagExpr = dagToExpr(dag1)
+    val dagExpr = dagToExpr(dag)
     context.typecheck(dagExpr.toTree)
   }
 
-  def instantiateObject[T](id: Id,
-    typ: Type,
-    mappings: Providers[DagNodeOrRef],
-    kindProvider: Symbol => Kinds): Expr[T] = {
-    context.Expr[T](instantiateObjectTree(id, typ, mappings, kindProvider))
-  }
+//  def instantiateObject[T](id: Id,
+//    typ: Type,
+//    mappings: Providers[DagNodeOrRef],
+//    kindProvider: Symbol => Kinds): Expr[T] = {
+//    context.Expr[T](instantiateObjectTree(id, typ, mappings, kindProvider))
+//  }
   
 }

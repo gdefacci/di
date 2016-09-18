@@ -4,7 +4,7 @@ import scala.reflect.macros.blackbox.Context
 
 object IOCMacro {
 
-  def get[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Expr[T] = {
+  def get[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Tree = {
     val kindProvider = new DefaultKindProvider[c.type](c)
 
     val td = new TypeDag[c.type](c)
@@ -14,7 +14,7 @@ object IOCMacro {
       mappings ++= td.toDagNodesWithRefs(module, kindProvider.apply)
     }
     
-    td.instantiateObject(Global, c.universe.weakTypeOf[T], mappings, kindProvider.apply)
+    td.instantiateObjectTree(Global, c.universe.weakTypeOf[T], mappings, kindProvider.apply)
   }
   
   def graph[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Expr[T] = {
@@ -33,8 +33,8 @@ object IOCMacro {
   def getSource[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Expr[String] = {
     import c.universe._
 
-    val expr = get[T](c)(modules:_*)
-    val resText = s"""${show(expr.tree)}"""
+    val tree = get[T](c)(modules:_*)
+    val resText = s"""${show(tree)}"""
 
     c.Expr[String](q"${resText}")
   }
