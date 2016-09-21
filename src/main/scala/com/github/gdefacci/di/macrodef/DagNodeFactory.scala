@@ -7,10 +7,9 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
 
   def instantiateDag[T](id: Id,
     typ: Type,
-    mappings: Providers[DagNodeOrRef],
-    kindProvider: Symbol => Kinds): Dag[DagNode] = {
+    mappings: Providers[DagNodeOrRef]): Dag[DagNode] = {
 
-    val typeResolver = new TypeResolver(mappings, kindProvider, MapOfBuffers.empty)
+    val typeResolver = new TypeResolver(mappings, MapOfBuffers.empty)
 
     val mpng = mappings.findMembers(id, (nd) => nd.typ <:< typ)
     mpng match {
@@ -19,7 +18,7 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
         if (!typ.typeSymbol.isAbstract) {
           typeResolver.resolveDagNodeOrRef(Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos), Nil)
         } else {
-          implementsAbstractType(typ, typeResolver, mappings, kindProvider)
+          implementsAbstractType(typ, typeResolver, mappings)
         }
       case Seq(dg) =>
         typeResolver.resolveDagNodeOrRef(dg.value, dg.inputs)
@@ -36,18 +35,17 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
 
   private def implementsAbstractType(typ: Type,
     typeResolver: TypeResolver,
-    mappings: Providers[DagNodeOrRef],
-    kindProvider: Symbol => Kinds): Dag[DagNode] = {
+    mappings: Providers[DagNodeOrRef]): Dag[DagNode] = {
 
     val primaryConstructor = membersSelect.getPrimaryConstructor(typ)
 
-    val membersDagInfo: Seq[MemberDagInfo] = membersSelect.abstractMembers(typ).map(mthd => implementMethod(mthd, mappings, kindProvider))
+    val membersDagInfo: Seq[MemberDagInfo] = membersSelect.abstractMembers(typ).map(mthd => implementMethod(mthd, mappings))
 
     val members = membersDagInfo.map(_.toTree)
 
     primaryConstructor.fold(
       valueDag[DagNode](Nil, reflectUtils.newTrait(typ.typeSymbol, members), Kind.default)) { constr =>
-        val dg = constructorDag(Kind.derived, typ, constr, kindProvider, members)
+        val dg = constructorDag(Kind.derived, typ, constr, members)
         typeResolver.resolveDagNodeOrRef(dg.value, dg.inputs)
       }
   }
@@ -67,8 +65,7 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
   }
 
   private def implementMethod(m: MethodSymbol,
-    initMappings: Providers[DagNodeOrRef],
-    kindProvider: Symbol => Kinds): MemberDagInfo = {
+    initMappings: Providers[DagNodeOrRef]): MemberDagInfo = {
     val parametersBindings: Seq[(Id, Dag[DagNodeOrRef])] = m.paramLists.flatMap { pars =>
       pars.flatMap { par =>
         val knd = kindProvider(par)
@@ -81,7 +78,7 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
       m.name,
       paramss = m.paramLists,
       m.returnType.typeSymbol,
-      instantiateDag(Global, m.returnType, mappings, kindProvider))
+      instantiateDag(Global, m.returnType, mappings))
   }
 
 }

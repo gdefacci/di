@@ -9,7 +9,8 @@ private[di] trait DagNodes[C <: Context] {
   import context.universe._
 
   lazy val reflectUtils = new ReflectUtils[context.type](context)
-
+  val kindProvider = new DefaultKindProvider[context.type](context)
+  
   object IdGen {
     private val counter = new java.util.concurrent.atomic.AtomicInteger(0)
     def next = counter.incrementAndGet
@@ -144,7 +145,7 @@ private[di] trait DagNodes[C <: Context] {
 
   }
 
-  class PolyDagNodeFactory(val kind: Kind, containerTermName: Option[TermName], method: MethodSymbol, polyType: PolyType, kindProvider: Symbol => Kinds) extends DagNodeDagFactory {
+  class PolyDagNodeFactory(val kind: Kind, containerTermName: Option[TermName], method: MethodSymbol, polyType: PolyType) extends DagNodeDagFactory {
 
     val (typeArgs, underlying) = method.returnType match {
       case TypeRef(NoPrefix, underlying, args) => (args -> underlying)

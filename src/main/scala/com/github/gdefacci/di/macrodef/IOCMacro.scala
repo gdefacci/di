@@ -5,29 +5,25 @@ import scala.reflect.macros.blackbox.Context
 object IOCMacro {
 
   def get[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Tree = {
-    val kindProvider = new DefaultKindProvider[c.type](c)
-
     val td = new TypeDag[c.type](c)
 
     val mappings = MProvidersMap.empty[Id, td.DagNodeOrRef, td.DagNodeDagFactory]
     modules.foreach { module =>
-      mappings ++= td.toDagNodesWithRefs(module, kindProvider.apply)
+      mappings ++= td.toDagNodesWithRefs(module)
     }
 
-    td.instantiateObjectTree(Global, c.universe.weakTypeOf[T], mappings, kindProvider.apply)
+    td.instantiateObjectTree(Global, c.universe.weakTypeOf[T], mappings)
   }
 
   def graph[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Expr[T] = {
-    val kindProvider = new DefaultKindProvider[c.type](c)
-
     val dg = new DagGraph[c.type](c)
 
     val mappings = MProvidersMap.empty[Id, dg.td.DagNodeOrRef, dg.td.DagNodeDagFactory]
     modules.foreach { module =>
-      mappings ++= dg.td.toDagNodesWithRefs(module, kindProvider.apply)
+      mappings ++= dg.td.toDagNodesWithRefs(module)
     }
 
-    c.Expr(dg.graphModel(Global, c.universe.weakTypeOf[T], mappings, kindProvider.apply))
+    c.Expr(dg.graphModel(Global, c.universe.weakTypeOf[T], mappings))
   }
 
   def getSource[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Expr[String] = {

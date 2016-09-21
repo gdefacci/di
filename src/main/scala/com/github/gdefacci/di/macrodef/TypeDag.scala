@@ -13,14 +13,14 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     def addPolyMembers(ms: Seq[(Id, DagNodeDagFactory)]) = copy(polyMembers = polyMembers ++ ms)
   }
 
-  def toDagNodesWithRefs(valueExpr: context.Expr[_], kindProvider: Symbol => Kinds): Providers[DagNodeOrRef] = {
+  def toDagNodesWithRefs(valueExpr: context.Expr[_]): Providers[DagNodeOrRef] = {
     val exprTyp = valueExpr.actualType
     val exprNm = TermName(context.freshName(exprTyp.typeSymbol.name.decodedName.toString))
     val exprDag = alias(exprNm, valueExpr.tree, Kind.default)
 
     val membersMapping = membersSelect.getBindings(exprTyp).foldLeft(ModuleMappings(Nil, Nil)) {
       case (acc, membersSelect.MethodBinding(member)) =>
-        val dgs = methodDag(exprDag, exprNm, member, kindProvider).toSeq.flatMap {
+        val dgs = methodDag(exprDag, exprNm, member).toSeq.flatMap {
           case dg @ Leaf(dn: DagNode) => (dn.kind.id -> dg) :: Nil
           case dg @ Node(dn: DagNode, _) => (dn.kind.id -> dg) :: Nil
           case _ => Nil
@@ -34,7 +34,7 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
         acc.addMembers(knds.ids.toSeq.map(id => id -> Leaf[DagNodeOrRef](Ref(Kind(id, knds.scope), concreteType.asType.toType, member.pos))))
       case (acc, membersSelect.PolyMethodBinding(member, polyType)) =>
         val knds = kindProvider(member)
-        acc.addPolyMembers(knds.ids.toSeq.map(id => id -> new PolyDagNodeFactory(Kind(id, knds.scope), Some(exprNm), member, polyType, kindProvider)))
+        acc.addPolyMembers(knds.ids.toSeq.map(id => id -> new PolyDagNodeFactory(Kind(id, knds.scope), Some(exprNm), member, polyType)))
     }
 
     val allMappings = membersMapping.addMember(exprDag.value.kind.id, exprDag)
@@ -44,10 +44,9 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
   def instantiateObjectTree[T](id: Id,
     typ: Type,
-    mappings: Providers[DagNodeOrRef],
-    kindProvider: Symbol => Kinds): Tree = {
+    mappings: Providers[DagNodeOrRef]): Tree = {
 
-    val dag = instantiateDag(id, typ, mappings, kindProvider)
+    val dag = instantiateDag(id, typ, mappings)
     val dagExpr = dagToExpr(dag)
     context.typecheck(dagExpr.toTree)
   }

@@ -10,7 +10,6 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
 
   class TypeResolver(
       mappings: Providers[DagNodeOrRef],
-      kindProvider: Symbol => Kinds,
       dagProviders: MapOfBuffers[Id, Dag[DagNode]]) {
 
     private val stack = collection.mutable.Queue.empty[DagNodeOrRef]
@@ -76,12 +75,12 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
                 error(s"cant find primary constructor for ${typ.typeSymbol.fullName}")
               }
               membersSelect.getPolyType(constructorMethod.returnType.etaExpand).map { polyType =>
-                val dg = new PolyDagNodeFactory(ref.kind, None, constructorMethod, polyType, kindProvider).apply(ref.typ).getOrElse {
+                val dg = new PolyDagNodeFactory(ref.kind, None, constructorMethod, polyType).apply(ref.typ).getOrElse {
                   error(s"error creating dag for polymorpic primary constructor for ${typ.typeSymbol.fullName}")
                 }
                 resolveDagNodeOrRef(dg.value, dg.inputs)
               }.getOrElse {
-                val dnd = constructorDag(ref.kind, typ, constructorMethod, kindProvider, Nil)
+                val dnd = constructorDag(ref.kind, typ, constructorMethod, Nil)
                 resolveDagNodeOrRef(dnd.value, dnd.inputs)
               }
             case Seq(dag) =>
