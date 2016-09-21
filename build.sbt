@@ -1,6 +1,6 @@
-organization := "org.obl"
+organization := "com.github.gdefacci"
 name := "macro-di"
-version := "0.1"
+version := "0.1.0-SNAPSHOT"
 
 scalaVersion := "2.11.8"
 
