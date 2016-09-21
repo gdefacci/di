@@ -2,23 +2,44 @@ package com.github.gdefacci.di.macrodef
 
 import language.experimental.macros
 import scala.reflect.macros.blackbox.Context
+import com.github.gdefacci.di.runtime.ModulesContainer
 
 private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with TypeResolverMixin[C] with DagNodeOrRefFactory[C] with DagNodeFactory[C] with DagToExpr[C] {
 
   import context.universe._
 
-  case class ModuleMappings(members: Seq[(Id, Dag[DagNodeOrRef])], polyMembers: Seq[(Id, DagNodeDagFactory)]) {
+  private case class ModuleMappings(members: Seq[(Id, Dag[DagNodeOrRef])], polyMembers: Seq[(Id, DagNodeDagFactory)]) {
     def addMember(id: Id, d: Dag[DagNodeOrRef]) = copy(members = members :+ (id -> d))
     def addMembers(ms: Seq[(Id, Dag[DagNodeOrRef])]) = copy(members = members ++ ms)
     def addPolyMembers(ms: Seq[(Id, DagNodeDagFactory)]) = copy(polyMembers = polyMembers ++ ms)
   }
+  
+  private val modulesContainerType = typeOf[ModulesContainer]
 
-  def toDagNodesWithRefs(valueExpr: context.Expr[_]): Providers[DagNodeOrRef] = {
-    val exprTyp = valueExpr.actualType
-    val exprNm = TermName(context.freshName(exprTyp.typeSymbol.name.decodedName.toString))
-    val exprDag = alias(exprNm, valueExpr.tree, Kind.default)
-
-    val membersMapping = membersSelect.getBindings(exprTyp).foldLeft(ModuleMappings(Nil, Nil)) {
+  private def createDagNodeOrRefProviders(moduleOrModuleContainerAlias:ExprAlias): Providers[DagNodeOrRef] = {
+    val exprTyp = moduleOrModuleContainerAlias.typ
+    if (exprTyp <:< modulesContainerType) {
+      moduleContainerDagNodeOrRefProviders(moduleOrModuleContainerAlias)
+    } else {
+      moduleDagNodeOrRefProviders(moduleOrModuleContainerAlias)
+    }
+  }
+  
+  private class ExprAlias(module: context.Tree, val typ:Type, val parent:Option[Dag[DagNodeOrRef]]) {
+    def this(module: context.Tree, parent:Option[Dag[DagNodeOrRef]]) = this(module, module.tpe, parent)
+    val termName = TermName(context.freshName(typ.typeSymbol.name.decodedName.toString))
+    val dag = alias(termName, module, typ, Kind.default, parent)
+  }
+  
+  def moduleDagNodeOrRefProviders(module: context.Expr[_]): Providers[DagNodeOrRef] = {
+    createDagNodeOrRefProviders(new ExprAlias(module.tree, None))
+  }
+  
+  def moduleDagNodeOrRefProviders(exprAlias:ExprAlias): Providers[DagNodeOrRef] = {
+    val exprNm = exprAlias.termName
+    val exprDag = exprAlias.dag
+    
+    val membersMapping = membersSelect.getBindings(exprAlias.typ).foldLeft(ModuleMappings(Nil, Nil)) {
       case (acc, membersSelect.MethodBinding(member)) =>
         val dgs = methodDag(exprDag, exprNm, member).toSeq.flatMap {
           case dg @ Leaf(dn: DagNode) => (dn.kind.id -> dg) :: Nil
@@ -41,6 +62,15 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
     MProvidersMap(allMappings.members, allMappings.polyMembers)
   }
+  
+  def moduleContainerDagNodeOrRefProviders(moduleContainerAlias:ExprAlias): Providers[DagNodeOrRef] = {
+    val mappings = MProvidersMap.empty[Id, DagNodeOrRef, DagNodeDagFactory]
+    membersSelect.getValues(moduleContainerAlias.typ).map { member =>
+      val memAlias = new ExprAlias(q"${moduleContainerAlias.termName}.${member.name}",member.returnType, Some(moduleContainerAlias.dag))
+      mappings  ++= moduleDagNodeOrRefProviders(memAlias)
+    }
+    mappings
+  }
 
   def instantiateObjectTree[T](id: Id,
     typ: Type,
@@ -50,12 +80,5 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     val dagExpr = dagToExpr(dag)
     context.typecheck(dagExpr.toTree)
   }
-
-  //  def instantiateObject[T](id: Id,
-  //    typ: Type,
-  //    mappings: Providers[DagNodeOrRef],
-  //    kindProvider: Symbol => Kinds): Expr[T] = {
-  //    context.Expr[T](instantiateObjectTree(id, typ, mappings, kindProvider))
-  //  }
 
 }

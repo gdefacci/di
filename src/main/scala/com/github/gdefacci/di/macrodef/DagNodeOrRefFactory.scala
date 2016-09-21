@@ -6,11 +6,15 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
 
   import context.universe._
 
-  def alias[N >: DagNode <: DagNodeOrRef](exprNm:TermName, valueExpr: Tree, kind:Kind):Dag[N] = {
+  def alias[N >: DagNode <: DagNodeOrRef](exprNm:TermName, valueExpr: Tree, tpe:Type, kind:Kind, parent:Option[Dag[N]]):Dag[N] = {
     val vexpr = q"""
     val $exprNm = $valueExpr
     """
-    Leaf[N](DagNode.value(kind, vexpr :: Nil, q"$exprNm", valueExpr.tpe, valueExpr.pos))
+    parent.map { par =>
+      Node[N](DagNode.value(kind, vexpr :: Nil, q"$exprNm", tpe, valueExpr.pos), par :: Nil)
+    }.getOrElse {
+      Leaf[N](DagNode.value(kind, vexpr :: Nil, q"$exprNm", tpe, valueExpr.pos))
+    }
   }
   
   private def getTyp(v:Tree) = {

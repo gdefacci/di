@@ -168,6 +168,14 @@ class ConstructorTests extends FunSuite {
     assert(IOC.get[Seq[Int]](Mod1, Mod2, Mod3).toSet == Set(Mod1.i1, Mod1.i2, Mod2.i3, Mod3.i455))
 
   }
+  
+  test("multi integers modules container") {
+
+    import MultiModule._
+    assert(IOC.get[Seq[Int]](ModBag).toSet == Set(Mod1.i1, Mod1.i2, Mod2.i3, Mod3.i455))
+
+    println(IOC.getSource[Seq[Int]](ModBag))
+  }
 
   test("named multi integers") {
 

@@ -3,6 +3,7 @@ package com.github.gdefacci.di.tests
 import com.github.gdefacci.di.runtime.AllBindings
 import javax.inject.Named
 import com.github.gdefacci.di.runtime.Bind
+import com.github.gdefacci.di.runtime.ModulesContainer
 
 object MultiModule {
 
@@ -61,5 +62,10 @@ object MultiModule {
     
   }
   
+  object ModBag extends ModulesContainer {
+    val m1 = Mod1
+    val m2 = Mod2
+    def m3 = Mod3
+  }
 
 }

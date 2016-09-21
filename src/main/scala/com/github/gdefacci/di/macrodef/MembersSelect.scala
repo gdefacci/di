@@ -67,6 +67,26 @@ private[di] class MembersSelect[C <: Context](val context: C) {
       }.toSeq
     }
   }
+  
+  def getValues[T](t: context.universe.Type):Seq[MethodSymbol]  = {
+    if (isPrimitive(t)) Nil
+    else {
+      lazy val skipMethods =
+        if (t.typeSymbol.isClass && t.typeSymbol.asClass.isCaseClass) caseClassInternalField
+        else baseSkipMethods
+  
+      t.members.flatMap {
+        case m if isBindingMethod(m) && !skipMethods.contains(m.name.toTermName.decodedName.toString) =>
+          val mthd = m.asMethod
+          if (mthd.paramLists.forall(_.length==0)) {
+            if (getPolyType(mthd).isEmpty) mthd :: Nil
+            else Nil
+          } else
+            Nil
+        case _ => Nil
+      }.toSeq
+    }
+  }
 
   sealed trait Binding
   case class MethodBinding(method:MethodSymbol) extends Binding  
