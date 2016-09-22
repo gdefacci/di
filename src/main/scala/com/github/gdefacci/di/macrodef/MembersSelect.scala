@@ -2,6 +2,7 @@ package com.github.gdefacci.di.macrodef
 
 import scala.reflect.macros.blackbox.Context
 import com.github.gdefacci.di.runtime.AllBindings
+import com.github.gdefacci.di.runtime.ModulesContainer
 
 private[di] object MembersSelect {
   val baseSkipMethods = Set("$init$", "synchronized", "##", "!=", "==", "ne", "eq", "asInstanceOf", "isInstanceOf")
@@ -42,6 +43,10 @@ private[di] class MembersSelect[C <: Context](val context: C) {
     case t @ PolyType(_, _) => Some(t)
     case _ => None
   }
+  
+  private val modulesContainerType = typeOf[ModulesContainer]
+  
+  def isModuleContainerInstance(t:Type) = (t <:< modulesContainerType) 
 
   def getBindings[T](t: context.universe.Type):Seq[Binding]  = {
     
@@ -54,7 +59,10 @@ private[di] class MembersSelect[C <: Context](val context: C) {
       t.members.collect {
         case m if isBindingMethod(m) && !skipMethods.contains(m.name.toTermName.decodedName.toString) =>
           val mthd = m.asMethod
-          getPolyType(mthd).map( PolyMethodBinding(mthd, _) ).getOrElse(MethodBinding(mthd))
+          getPolyType(mthd).map( PolyMethodBinding(mthd, _) ).getOrElse {
+            if (isValueMember(mthd) && isModuleContainerInstance(mthd.returnType)) ModuleContainerBinding(mthd, mthd.returnType)
+            else MethodBinding(mthd)
+          }
         case m if isPublicMethod(m) && m.asMethod.isGetter && isBindInstance(m) =>
           val bindTyp = m.asMethod.returnType
           bindTyp.typeArgs match {
@@ -64,11 +72,17 @@ private[di] class MembersSelect[C <: Context](val context: C) {
         case m if m.isType && !m.isAbstract && getPrimaryConstructor(m.asType.toType).isDefined =>
           val mthd = getPrimaryConstructor(m.asType.toType).get
           getPolyType(mthd).map( PolyMethodBinding(mthd, _) ).getOrElse(MethodBinding(mthd))
+        case x if x.isModule => 
+          val typ = x.asModule.moduleClass.asType.toType
+          if (isModuleContainerInstance(typ)) ModuleContainerBinding(x, typ)
+          else ObjectBinding(x.asModule)
       }.toSeq
     }
   }
   
-  def getValues[T](t: context.universe.Type):Seq[MethodSymbol]  = {
+  private def isValueMember(mthd:MethodSymbol) = mthd.paramLists.forall(_.length==0)
+  
+  def getValues[T](t: context.universe.Type):Seq[Symbol]  = {
     if (isPrimitive(t)) Nil
     else {
       lazy val skipMethods =
@@ -78,11 +92,13 @@ private[di] class MembersSelect[C <: Context](val context: C) {
       t.members.flatMap {
         case m if isBindingMethod(m) && !skipMethods.contains(m.name.toTermName.decodedName.toString) =>
           val mthd = m.asMethod
-          if (mthd.paramLists.forall(_.length==0)) {
+          if (isValueMember(mthd)) {
             if (getPolyType(mthd).isEmpty) mthd :: Nil
             else Nil
           } else
             Nil
+         case x if x.isModule  => x :: Nil
+            
         case _ => Nil
       }.toSeq
     }
@@ -90,7 +106,9 @@ private[di] class MembersSelect[C <: Context](val context: C) {
 
   sealed trait Binding
   case class MethodBinding(method:MethodSymbol) extends Binding  
+  case class ModuleContainerBinding(method:Symbol, typ:Type) extends Binding  
   case class PolyMethodBinding(method:MethodSymbol, methodType:PolyType) extends Binding  
+  case class ObjectBinding(module:ModuleSymbol) extends Binding  
   case class BindInstance(method:MethodSymbol, abstractType:Symbol, concreteType:Symbol) extends Binding
 
   def abstractMembers(t: context.universe.Type): Seq[MethodSymbol] = {
@@ -105,7 +123,7 @@ private[di] class MembersSelect[C <: Context](val context: C) {
       case sym: MethodSymbol if sym.isPrimaryConstructor && sym.isPublic => sym
     }
   
-  def isMultiTarget(typ:Type) = {
+  private def isMultiTarget(typ:Type) = {
     typ.erasure =:= allBindingsAny
   }
   

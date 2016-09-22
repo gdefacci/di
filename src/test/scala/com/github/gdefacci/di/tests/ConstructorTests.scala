@@ -277,4 +277,16 @@ class ConstructorTests extends FunSuite {
    assert(bpc.bi.b == "abba")
    
  }
+ 
+ test("Modules Container") {
+   import samples1._
+
+   val user = IOC.get[User](UserModule)
+   
+   assert(user.admin == UserModule3.isAdmin)
+   assert(user.name == UserModule2.name)
+   assert(user.id == UserModule.anInt)
+   
+ }
+ 
 }
