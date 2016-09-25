@@ -68,4 +68,18 @@ object MultiModule {
     def m3 = Mod3
   }
 
+  case class MultiIncompleteCl(s:String, i:Int)
+  
+  object MultiIncomplete {
+    
+    val str = "pippo"
+    
+    def seqOfInt(mics:AllBindings[MultiIncompleteCl]):Seq[Int] = {
+      mics.values.map(_.i)
+    }
+    
+    val mci = Bind[MultiIncompleteCl,MultiIncompleteCl]
+    
+  }
+  
 }

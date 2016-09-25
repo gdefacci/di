@@ -75,11 +75,12 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
       annotation.tree.children match {
         case Nil => throw new RuntimeException("annotation macro erro")
         case Select(_, name) :: rest =>
-          val parsMap = rest.collect {
-            case arg @ AssignOrNamedArg(id: Ident, Literal(Constant(v))) =>
-              id.name.decodedName.toString -> v
+          val constr = annotation.tree.tpe.members.find( m => m.isConstructor).get
+          val pars = constr.asMethod.paramLists.flatten
+          val parsMap = pars.zip(rest).map { case (par, Literal(Constant(a)))   =>
+            par.name.toString -> a
           }
-          Some(WithQualifier(name.decodedName.toString, parsMap.toMap))
+          Some(WithQualifier(annotationTpe.typeSymbol.fullName.toString, parsMap.toMap))
       }
     } else {
       None

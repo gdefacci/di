@@ -2,6 +2,7 @@ package com.github.gdefacci.di.tests
 
 import com.github.gdefacci.di.IOC
 import org.scalatest.FunSuite
+import com.github.gdefacci.di.tests.MultiModule.MultiIncompleteCl
 
 class ConstructorTests extends FunSuite {
 
@@ -288,5 +289,5 @@ class ConstructorTests extends FunSuite {
    assert(user.id == UserModule.anInt)
    
  }
- 
+
 }

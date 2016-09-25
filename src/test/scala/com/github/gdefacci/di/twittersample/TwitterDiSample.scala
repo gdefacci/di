@@ -8,7 +8,16 @@ object TwitterDiSample extends App {
   
   val grph = IOC.graph[ApplicationComponentImpl]("user")
   
+  val grph1 = {
+    
+    import com.github.gdefacci.di.tests.samples2._
+
+    IOC.graph[ServiceDRepo](module5BindQualifier)
+  }
+  
   println(grph.mkString("\n"))
+  println("="*80)
+  println(grph1.mkString("\n"))
 //  val app1 = IOC.getSource[ApplicationComponent]("user")
 ////  val app2 = IOC.get[ApplicationComponentImpl](TwitterModule, "user")
 //  val app2Src = IOC.getSource[ApplicationComponentImpl](TwitterModule, "user")
