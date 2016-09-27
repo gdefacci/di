@@ -163,6 +163,14 @@ class ConstructorTests extends FunSuite {
     assert(service.service.repository == service.service1.repository)
   }
   
+  test("singleton polymorphic") {
+    import samples2._
+
+    val gbc = IOC.get[GenBiGCl](module8)
+    assert(gbc.a == gbc.c)
+    assert(gbc.b.v == module8.b)
+  }
+  
   test("multi integers") {
 
     import MultiModule._
@@ -175,7 +183,6 @@ class ConstructorTests extends FunSuite {
     import MultiModule._
     assert(IOC.get[Seq[Int]](ModBag).toSet == Set(Mod1.i1, Mod1.i2, Mod2.i3, Mod3.i455))
 
-    println(IOC.getSource[Seq[Int]](ModBag))
   }
 
   test("named multi integers") {

@@ -52,6 +52,9 @@ private[di] object Dag {
     }
   }
 
+  /**
+   * FIXME not used
+   */
   def isConnectedTo[T](dag: Dag[T], pred: T => Boolean, current: MMap[Dag[T], Boolean]): Boolean = {
     current.get(dag) match {
       case Some(v) => v

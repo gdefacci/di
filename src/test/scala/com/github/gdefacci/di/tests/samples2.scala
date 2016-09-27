@@ -141,4 +141,19 @@ object samples2 {
     val bindRepo = Bind[Repository, MyRepo]
     
   }
+  
+  class GItm()
+  class GCl[T](val v:T)
+  case class GenBiGCl(a:GCl[GItm], b:GCl[Boolean], c:GCl[GItm])
+  
+  object module8 {
+    
+    val b = true
+    val gitm = new GItm
+    
+    @Singleton
+    def createGCl[T](v:T):GCl[T] = new GCl[T](v)
+    
+  }
+  
 }

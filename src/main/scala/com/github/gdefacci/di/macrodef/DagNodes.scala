@@ -31,7 +31,6 @@ private[di] trait DagNodes[C <: Context] {
 
   sealed abstract case class DagNode(id: Int) extends DagNodeOrRef {
     def providerSource: ProviderSource
-//    def singletonName: TermName
     def invoke(inputs: Seq[Tree]): Tree
     def initialization: Seq[Tree] => Seq[Tree]
   }
@@ -60,7 +59,6 @@ private[di] trait DagNodes[C <: Context] {
       assert(typ != null, s"could not infer type on tree $description")
 
       def invoke(inputs: Seq[Tree]): Tree = invoker(inputs)
-//      lazy val singletonName = TermName(context.freshName(s"${baseName}Singleton"))
 
       lazy val providerSource = lazyProviderSource
     }
@@ -72,36 +70,26 @@ private[di] trait DagNodes[C <: Context] {
       initialization: Seq[Tree] => Seq[Tree],
       invoker: Seq[Tree] => Tree,
       typ: Type,
-      sourcePos: Position): DagNode = {
-      new DagNodeImpl(providerSource, kind, description, initialization, invoker, typ, sourcePos)
-    }
+      sourcePos: Position): DagNode = new DagNodeImpl(providerSource, kind, description, initialization, invoker, typ, sourcePos)
 
-    def value(kind: Kind, initialization: Seq[Tree], value: Tree, typ: Type, sourcePos: Position) = {
-      apply(ProviderSource.ValueSource,
-        kind, s"$value", trees => initialization, (trees) => value, typ, sourcePos)
-    }
+    def value(kind: Kind, initialization: Seq[Tree], value: Tree, typ: Type, sourcePos: Position) = 
+      apply(ProviderSource.ValueSource, kind, s"$value", trees => initialization, trees => value, typ, sourcePos)
+    
 
     def methodCall(kind: Kind, containerTermName: Option[TermName], method: Symbol) = {
       lazy val methodSymbol = method.asMethod
       val providerSource = new ProviderSource.MethodSource(method.asMethod)
       val mthdName = method.name.decodedName.toString
       if (kind.scope != SingletonScope) {
-        apply(providerSource,
-          kind,
-          s"$method",
+        apply(providerSource, kind, s"$method",
           trees => Nil,
           inputs => reflectUtils.methodCall(containerTermName, methodSymbol, inputs),
           typ = methodSymbol.returnType,
           sourcePos = method.pos)
       } else {
         val singletonName = TermName(context.freshName(s"singleton${mthdName}"))
-        apply(providerSource,
-          kind,
-          s"singleton${mthdName}",
-          inps =>
-            Seq(q"""
-                val ${singletonName} = ${reflectUtils.methodCall(containerTermName, methodSymbol, inps)}
-            """),
+        apply(providerSource, kind, s"singleton${mthdName}",
+          inps => Seq(q"""val ${singletonName} = ${reflectUtils.methodCall(containerTermName, methodSymbol, inps)}"""),
           inps => q"$singletonName",
           methodSymbol.returnType,
           methodSymbol.pos)
@@ -120,14 +108,9 @@ private[di] trait DagNodes[C <: Context] {
         apply(providerSource, kind, s"$constructor", trees => Nil, invoker, typ, constructor.pos)
       } else {
         val singletonName = TermName(context.freshName(s"singleton${typName}"))
-        apply(providerSource,
-            kind,
+        apply(providerSource, kind,
             s"singleton${typName}",
-            inps => { 
-            Seq(q"""
-                val ${singletonName} = ${invoker(inps)}
-            """)
-            },
+            inps => Seq(q"""val ${singletonName} = ${invoker(inps)}"""),
             inps => q"$singletonName",
             constructor.returnType,
             constructor.pos)
@@ -167,24 +150,23 @@ private[di] trait DagNodes[C <: Context] {
 
         if (concrTypeArgs.length != underlyingTypeArgs.length) context.abort(context.enclosingPosition, "concrTypeArgs.length != underlyingTypeArgs.length")
 
-        val z: Option[List[(TypeSymbol, Type)]] = Some(Nil)
+        val z: Option[(List[TypeSymbol], List[Type])] = Some(Nil, Nil)
 
         val optSubstitutions = concrTypeArgs.zip(underlyingTypeArgs).foldLeft(z) {
-          case (Some(mp), (concr, gen)) =>
+          case (Some((ls, ts)), (concr, gen)) =>
             gen match {
               case TypeRef(NoPrefix, typVar, Nil) =>
-                Some(mp :+ (gen.typeSymbol.asType -> concr))
+                Some((ls :+ gen.typeSymbol.asType) -> (ts :+ concr))
               case gts =>
                 if (concr.typeSymbol != gen) None
-                else Some(mp)
+                else Some(ls-> ts)
             }
           case (None, _) => None
         }
 
         optSubstitutions.map { typesBinds =>
 
-          val tpKeys = typesBinds.map(_._1)
-          val tpVals = typesBinds.map(_._2)
+          val (tpKeys, tpVals) = typesBinds
 
           val substTypes = polyType.typeParams.map { tp =>
             tp.asType.toType.substituteTypes(tpKeys, tpVals)
@@ -203,16 +185,26 @@ private[di] trait DagNodes[C <: Context] {
 
           val mRetType = polyType.resultType.substituteTypes(tpKeys, tpVals)
 
-          Node[DagNodeOrRef](
-            DagNode(
-              new ProviderSource.MethodSource(method),
-              kind,
-              s"$method[${substTypes.mkString(", ")}]",
+          val providerSource = new ProviderSource.MethodSource(method)
+          val description = s"$method[${substTypes.mkString(", ")}]"
+          val invoker:Seq[Tree] => Tree = { args => reflectUtils.methodCall(containerTermName, method, substTypes, args) }
+          
+          val nd = if (kind.scope != SingletonScope) {
+            DagNode(providerSource, kind, description,
               initialization = _ => Nil,
-              invoker = { args => reflectUtils.methodCall(containerTermName, method, substTypes, args) },
+              invoker = invoker,
               concreteType,
-              method.pos),
-            dagInputs)
+              method.pos)
+          } else {
+            val singletonName = TermName(context.freshName(s"singleton${method.name}"))
+            DagNode(providerSource, kind, s"singleton$description",
+                inps => Seq(q"""val ${singletonName} = ${invoker(inps)}"""),
+                inps => q"$singletonName",
+                concreteType,
+                method.pos)
+          }
+          
+          Node[DagNodeOrRef](nd, dagInputs)
         }
       }
     }
