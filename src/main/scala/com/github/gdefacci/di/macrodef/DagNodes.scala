@@ -80,15 +80,16 @@ private[di] trait DagNodes[C <: Context] {
       lazy val methodSymbol = method.asMethod
       val providerSource = new ProviderSource.MethodSource(method.asMethod)
       val mthdName = method.name.decodedName.toString
+      val description = s"${method.owner.name}.${method.name}"
       if (kind.scope != SingletonScope) {
-        apply(providerSource, kind, s"$method",
+        apply(providerSource, kind, description,
           trees => Nil,
           inputs => reflectUtils.methodCall(containerTermName, methodSymbol, inputs),
           typ = methodSymbol.returnType,
           sourcePos = method.pos)
       } else {
         val singletonName = TermName(context.freshName(s"singleton${mthdName}"))
-        apply(providerSource, kind, s"singleton${mthdName}",
+        apply(providerSource, kind, description,
           inps => Seq(q"""val ${singletonName} = ${reflectUtils.methodCall(containerTermName, methodSymbol, inps)}"""),
           inps => q"$singletonName",
           methodSymbol.returnType,

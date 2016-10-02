@@ -23,8 +23,14 @@ private[di] trait DagNodeFactory[C <: Context] { self: DagNodes[C] with DagNodeO
       case Seq(dg) =>
         typeResolver.resolveDagNodeOrRef(dg.value, dg.inputs)
       case _ => 
-        context.abort(context.enclosingPosition, s"more than one instance for $id $typ ${mpng.mkString(", ")}")
+        context.abort(context.enclosingPosition, s"more than one instance of $typ ${describeId(id)}: ${mpng.map(_.value).mkString(", ")}")
     }
+  }
+  
+  private def describeId(id:Id) = id match {
+    case Global | Derived => ""
+    case WithName(nm) => s"with name $nm"
+    case WithQualifier(nm, mp) => s"with qualifier $nm (${mp.mkString(", ")})"
   }
   
   private def checkIsNotPrimitive(id: Id, typ: Type) = {
