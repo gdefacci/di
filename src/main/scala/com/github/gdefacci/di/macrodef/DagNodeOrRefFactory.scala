@@ -61,6 +61,6 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     Node[DagNodeOrRef](DagNode.constructorCall(knd, exprType, constructorMethod, members), parametersDags)
   }
 
-  def parameterDag(par:Symbol, knd:Kind): Dag[DagNodeOrRef]  =
-    Leaf[DagNodeOrRef](DagNode.value(knd, Nil, q"${par.asTerm.name}", par.info, par.pos))
+  def parameterDag(par:Symbol, knd:Kind): Dag[DagNode]  =
+    Leaf[DagNode](DagNode.value(knd, Nil, q"${par.asTerm.name}", par.info, par.pos))
 }

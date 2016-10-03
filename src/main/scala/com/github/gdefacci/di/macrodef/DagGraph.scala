@@ -13,7 +13,11 @@ class DagGraph[C <: Context](val context: C) {
   def graphModel(id: Id,
     typ: Type,
     mappings: td.Providers[td.DagNodeOrRef]): Tree = {
-    val dag = td.instantiateDag(id, typ, mappings)
+    
+    val typeResolver = new td.TypeResolver(mappings, MapOfBuffers.empty)
+
+    val dag = typeResolver.resolveDagNodeOrRef(td.Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos), Nil)
+
     val graphNodes = Dag.visit(dag).map(toDependencyTree)
     context.typecheck(q"List(..$graphNodes)")
   }

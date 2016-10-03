@@ -4,7 +4,7 @@ import language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 import com.github.gdefacci.di.runtime.ModulesContainer
 
-private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with TypeResolverMixin[C] with DagNodeOrRefFactory[C] with DagNodeFactory[C] with DagToExpr[C] {
+private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with TypeResolverMixin[C] with DagNodeOrRefFactory[C] with DagToExpr[C] {
 
   import context.universe._
 
@@ -54,9 +54,9 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
       case (acc, membersSelect.BindInstance(member, abstractType, concreteType)) =>
         
         val knds = kindProvider(member)
-        if (concreteType.isAbstract) {
-          context.abort(member.pos, s"The second type parameter of Bind must be a concrete class, ${concreteType} is not")
-        }
+//        if (concreteType.isAbstract) {
+//          context.abort(member.pos, s"The second type parameter of Bind must be a concrete class, ${concreteType} is not")
+//        }
         acc.addMembers(knds.ids.toSeq.map(id => id -> Leaf[DagNodeOrRef](Ref(Kind(id, knds.scope), concreteType.asType.toType, member.pos))))
       
       case (acc, membersSelect.ModuleContainerBinding(member, typ)) =>
@@ -100,7 +100,10 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     typ: Type,
     mappings: Providers[DagNodeOrRef]): Tree = {
 
-    val dag = instantiateDag(id, typ, mappings)
+    val typeResolver = new TypeResolver(mappings, MapOfBuffers.empty)
+
+    val dag = typeResolver.resolveDagNodeOrRef(Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos), Nil)
+
     val dagExpr = dagToExpr(dag)
     context.typecheck(dagExpr.toTree)
   }

@@ -10,9 +10,8 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
 
   class TypeResolver(
       mappings: Providers[DagNodeOrRef],
-      dagProviders: MapOfBuffers[Id, Dag[DagNode]]) {
-
-    private val stack = collection.mutable.Queue.empty[DagNodeOrRef]
+      dagProviders: MapOfBuffers[Id, Dag[DagNode]],
+      stack: collection.mutable.Queue[DagNodeOrRef] = collection.mutable.Queue.empty[DagNodeOrRef]) {
 
     private def error(msg: String) = {
       val stackLog: String = stack.reverse.map(hd => s"resolving ${hd.typ}").mkString("\n")
@@ -39,8 +38,14 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         case Seq(hd) =>
           hd
         case items =>
-          error(s"more than 1 instance available for ${typ} with id ${ref.kind.id} ${items.map(_.value).mkString(", ")}")
+          error(s"more than one instance of $typ ${describeId(id)}: ${items.map(_.value).mkString(", ")}")
       }
+    }
+
+    private def describeId(id: Id) = id match {
+      case Global | Derived => ""
+      case WithName(nm) => s"with name $nm"
+      case WithQualifier(nm, mp) => s"with qualifier $nm (${mp.mkString(", ")})"
     }
 
     def resolveDagNodeOrRef(nd: DagNodeOrRef, inputs: Seq[Dag[DagNodeOrRef]]): Dag[DagNode] = {
@@ -58,7 +63,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
 
     private def checkIsNotPrimitive(id: Id, typ: Type) = {
       if (membersSelect.isPrimitive(typ)) {
-        error(s"could not find a binding for $typ with id $id")
+        error(s"could not find a binding for $typ ${describeId(id)}")
       }
     }
 
@@ -71,22 +76,30 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
           polyMembers match {
             case Seq() =>
               checkIsNotPrimitive(id, typ)
-              val constructorMethod = membersSelect.getPrimaryConstructor(typ).getOrElse {
-                error(s"cant find primary constructor for ${typ.typeSymbol.fullName}")
-              }
-              membersSelect.getPolyType(constructorMethod.returnType.etaExpand).map { polyType =>
-                val dg = new PolyDagNodeFactory(ref.kind, None, constructorMethod, polyType).apply(ref.typ).getOrElse {
-                  error(s"error creating dag for polymorpic primary constructor for ${typ.typeSymbol.fullName}")
+              if (typ.erasure <:< weakTypeOf[Function1[_, _]]) {
+                val Seq(in,out) = typ.typeArgs
+                implementsFunction(ref.kind, typ, ref.sourcePos, in, out)
+              } else if (typ.typeSymbol.isAbstract) {
+                implementsAbstractType(ref.kind, typ)
+              } else {
+                val constructorMethod = membersSelect.getPrimaryConstructor(typ).getOrElse {
+                  error(s"cant find primary constructor for ${typ.typeSymbol.fullName} resolving $typ ${describeId(id)}")
                 }
-                resolveDagNodeOrRef(dg.value, dg.inputs)
-              }.getOrElse {
-                val dnd = constructorDag(ref.kind, typ, constructorMethod, Nil)
-                resolveDagNodeOrRef(dnd.value, dnd.inputs)
+                membersSelect.getPolyType(constructorMethod.returnType.etaExpand).map { polyType =>
+                  val dg = new PolyDagNodeFactory(ref.kind, None, constructorMethod, polyType).apply(ref.typ).getOrElse {
+                    error(s"error creating dag for polymorpic primary constructor for ${typ.typeSymbol.fullName} resolving $typ ${describeId(id)}")
+                  }
+                  resolveDagNodeOrRef(dg.value, dg.inputs)
+                }.getOrElse {
+                  val dnd = constructorDag(ref.kind, typ, constructorMethod, Nil)
+                  resolveDagNodeOrRef(dnd.value, dnd.inputs)
+                }
               }
+
             case Seq(dag) =>
               resolveDagNodeOrRef(dag.value, dag.inputs)
             case _ =>
-              error(s"found more than a polymorphic factory for ${typ.typeSymbol.fullName}")
+              error(s"found more than a polymorphic factory for $typ ${describeId(id)}")
           }
 
         case Seq(dag) =>
@@ -99,8 +112,8 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       val Ref(Kind(id, _), typ, pos) = ref
       val insts: Seq[Dag[DagNodeOrRef]] = mappings.findMembers(id, (nd) => nd != ref && nd.typ <:< itemType)
 
-      val nd = DagNode(new ProviderSource.AllbindingsSource(itemType.typeSymbol.asType), 
-        Kind.default, 
+      val nd = DagNode(new ProviderSource.AllbindingsSource(itemType.typeSymbol.asType),
+        Kind.default,
         s"allBindings$itemType",
         inps => Nil,
         inps => q"new com.github.gdefacci.di.runtime.AllBindings[$itemType]( List[$itemType](..$inps) )",
@@ -114,6 +127,78 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         Leaf(nd)
       case inputs =>
         Node[DagNode](nd, inputs.map(dg => resolveDagNodeOrRef(dg.value, dg.inputs)))
+    }
+    
+    private def implementsFunction(kind: Kind, funTyp:Type,  pos: Position, inp:Type, ret: Type): Dag[DagNode] = {
+      val parName = TermName("par")
+      val nd:Dag[DagNodeOrRef] = Leaf(DagNode.value(Kind.default, Nil, q"$parName",  inp, pos))
+      val inpDag1 = Seq[(Id, Dag[DagNodeOrRef])] (nd.value.kind.id ->  nd)
+      val inpts = resolveSeparate(ret, inpDag1) :: Nil
+      
+      Node(DagNode(
+        ProviderSource.ValueSource,
+        kind,
+        funTyp.toString,
+        _ => Nil,
+        deps => {
+          q"($parName:$inp) => ${deps.head}"
+        },
+        funTyp,
+        pos), inpts)
+    }
+
+    private def implementsAbstractType(kind: Kind, typ: Type): Dag[DagNode] = {
+
+      val primaryConstructor = membersSelect.getPrimaryConstructor(typ)
+      val primaryConstrArgs = primaryConstructor.map(_.paramLists.flatten).getOrElse(Nil).map { par =>
+        resolveDagNodeOrRef(Ref(Kind.default, par.info, par.pos), Nil)
+      }
+
+      val membersPairs = membersSelect.abstractMembers(typ).map(mthd => mthd -> implementMethod(mthd))
+
+      Node(DagNode(
+        ProviderSource.ValueSource,
+        kind,
+        typ.typeSymbol.fullName,
+        _ => Nil,
+        deps => {
+          val (inputs, mthds) = deps.splitAt(primaryConstrArgs.length)
+          val members = mthds.zip(membersPairs.map(_._1)).map {
+            case (impl, mthd) =>
+              val args = mthd.paramLists.map { pars =>
+                pars.map { par =>
+                  q"""${par.asTerm.name}: ${par.info}"""
+                }
+              }
+              q"""def ${mthd.name}(...${args}):${mthd.returnType} = { $impl }"""
+          }
+          primaryConstructor match {
+            case None => reflectUtils.newTrait(typ.typeSymbol, members)
+            case Some(constructor) =>
+              reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, inputs, members)
+          }
+        },
+        typ,
+        typ.typeSymbol.pos), primaryConstrArgs ++ membersPairs.map(_._2))
+    }
+
+    private def implementMethod(m: MethodSymbol): Dag[DagNode] = {
+      val parametersBindings: Seq[(Id, Dag[DagNodeOrRef])] = m.paramLists.flatMap { pars =>
+        pars.flatMap { par =>
+          val knd = kindProvider(par)
+          knd.ids.map(id => id -> parameterDag(par, Kind(id, knd.scope)))
+        }
+      }
+      val typ = m.returnType
+      resolveSeparate(typ, parametersBindings)
+    }
+
+    private def resolveSeparate(typ: Type, parametersBindings: Seq[(Id, Dag[DagNodeOrRef])]): Dag[DagNode] = {
+      val nmappings: Providers[DagNodeOrRef] = mappings.copy()
+      nmappings ++= parametersBindings
+      val dagProviders = this.dagProviders.copy
+
+      new TypeResolver(nmappings, dagProviders, stack.clone()).resolveDagNodeOrRef(Ref(Kind(Global, DefaultScope), typ, typ.typeSymbol.pos), Nil)
     }
 
   }

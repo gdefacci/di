@@ -296,5 +296,13 @@ class ConstructorTests extends FunSuite {
    assert(user.id == UserModule.anInt)
    
  }
+ 
+ test("ioc dependency 1") {
+   import samples3._
+
+   val houseFactory = IOC.get[String => House](Module9, Module9A)
+   
+   assert(houseFactory("pippo") == House(Person("pippo", 33)))
+ }
 
 }
