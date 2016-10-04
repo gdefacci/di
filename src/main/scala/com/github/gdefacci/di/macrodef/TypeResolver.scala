@@ -76,9 +76,8 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
           polyMembers match {
             case Seq() =>
               checkIsNotPrimitive(id, typ)
-              if (typ.erasure <:< weakTypeOf[Function1[_, _]]) {
-                val Seq(in,out) = typ.typeArgs
-                implementsFunction(ref.kind, typ, ref.sourcePos, in, out)
+              if (definitions.FunctionClass.seq.contains(typ.typeSymbol)) {
+                implementsFunction(ref.kind, typ, ref.sourcePos)
               } else if (typ.typeSymbol.isAbstract) {
                 implementsAbstractType(ref.kind, typ)
               } else {
@@ -129,11 +128,15 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         Node[DagNode](nd, inputs.map(dg => resolveDagNodeOrRef(dg.value, dg.inputs)))
     }
     
-    private def implementsFunction(kind: Kind, funTyp:Type,  pos: Position, inp:Type, ret: Type): Dag[DagNode] = {
-      val parName = TermName("par")
-      val nd:Dag[DagNodeOrRef] = Leaf(DagNode.value(Kind.default, Nil, q"$parName",  inp, pos))
-      val inpDag1 = Seq[(Id, Dag[DagNodeOrRef])] (nd.value.kind.id ->  nd)
-      val inpts = resolveSeparate(ret, inpDag1) :: Nil
+    private def implementsFunction(kind: Kind, funTyp:Type,  pos: Position): Dag[DagNode] = {
+      val inpTypes = funTyp.typeArgs.init
+      val resType = funTyp.typeArgs.last
+      val parnames = 1.to(inpTypes.length).map( i => TermName(s"par$i"))
+      val pars = inpTypes.zip(parnames).map { case (inp, parName) => q"$parName:$inp"}
+      val nds = inpTypes.zip(parnames).map { case (inp, parName) => Leaf(DagNode.value(Kind.default, Nil, q"$parName",  inp, pos)):Dag[DagNodeOrRef] }
+      val inpDags = nds.map(nd => nd.value.kind.id ->  nd)
+      
+      val inpts = resolveSeparate(resType, inpDags) :: Nil
       
       Node(DagNode(
         ProviderSource.ValueSource,
@@ -141,7 +144,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         funTyp.toString,
         _ => Nil,
         deps => {
-          q"($parName:$inp) => ${deps.head}"
+          q"(..$pars) => ${deps.head}"
         },
         funTyp,
         pos), inpts)
