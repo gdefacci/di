@@ -1,0 +1,505 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+	<title>scala dependency injection</title>
+
+	<link rel="stylesheet" href="css/reveal.css">
+	<link rel="stylesheet" href="css/theme/white.css">
+
+	<!-- Theme used for syntax highlighting of code -->
+	<link rel="stylesheet" href="lib/css/atom-one-light.css">
+
+	<!-- Printing and PDF exports -->
+	<script>
+		var link = document.createElement( 'link' );
+		link.rel = 'stylesheet';
+		link.type = 'text/css';
+		link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+		document.getElementsByTagName( 'head' )[0].appendChild( link );
+	</script>
+
+	<style>
+		section p {
+			text-align: justify;
+		}
+
+		.reveal pre {
+			box-shadow: none;
+			;
+			width: 100%;
+		}
+
+		.reveal pre code {
+			max-height: none;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="reveal">
+		<div class="slides">
+
+			<section>
+				<h3>what is di?</h3>
+			</section>
+
+			<section>
+				<ul>
+					<li>the term was coined by Martin Fowler in 2004 in the essay <b>Inversion of Control Containers and the Dependency Injection pattern</b></li>
+					<li>it is a corollary of <b>Hollywood Pattern</b> (don’t call us, we’ll call you) (Gang of Four, Design Patterns, 1994 discussing
+						on ‘Template’ Pattern)</li>
+					<li><b>The HollywoodPrinciple</b> is where an object's (or component's) initial condition and ongoing lifecycle is handled
+						by its environment rather than by the object itself.(http://c2.com/cgi/wiki?HollywoodPrinciple)</li>
+				</ul>
+			</section>
+
+			<section>
+				<h3>wikipedia</h3>
+				<p>Dependency injection involves four roles:</p>
+				<ul>
+					<li>the service object(s) to be used</li>
+					<li>the client object that is depending on the services it uses</li>
+					<li>the interfaces that define how the client may use the services</li>
+					<li>the injector, which is responsible for constructing the services and injecting them into the client</li>
+				</ul>
+			</section>
+
+			<section>
+				<h3>wikipedia</h3>
+				<p>Any object that may be used can be considered a service. Any object that uses other objects can be considered a client.</p>
+			</section>
+
+			<section>
+				<h3>wikipedia</h3>
+				<p>The interfaces are the types the client expects its dependencies to be</p>
+			</section>
+
+			<section>
+				<h3>wikipedia</h3>
+				<p>The injector introduces the services into the client. Often, it also constructs the client. An injector may connect together
+					a very complex object graph by treating an object like a client and later as a service for another client.</p>
+			</section>
+
+			<section>
+				<h3>modules</h3>
+				<p>All the modern di framework supports the concept of module</p>
+				<p>a module is just an aggregate of services</p>
+			</section>
+
+			<section>
+				<h3>but why?</h3>
+			</section>
+
+			<section>
+				<h3>some background</h3>
+			</section>
+			<section>
+				<p>in the late 1990's OOP was becoming mainstream, and large scale sistems maintenability started to become a problem</p>
+			</section>
+
+			<section>
+				<h3>the xml era</h3>
+			</section>
+
+			<section>
+				<div>
+					<ul>
+						<li>j2ee(1999)</li>
+						<li>osgi(1999)</li>
+						<li>
+							<p><i>lightweight</i> ioc containers</p>
+							<ul>
+								<li>avalon(1999)</li>
+								<li>spring(2003)</li>
+								<li>picocontainer(2003)</li>
+							</ul>
+						</li>
+					</ul>
+				</div>
+			</section>
+
+			<section>
+				<h3>key ideas</h3>
+				<ul>
+					<li>clients ask the container an object(service) with a name and the container(injector) give them back an instance</li>
+					<li>object(service) creation and lifecycle is specified with xml</li>
+				</ul>
+				<pre><code data-code="/src/web/resources/application-context.xml" data-trim></code></pre>
+			</section>
+
+			<section>
+
+				<h3>Wikipedia - Advantages distilled</h3>
+
+				<ul>
+					<li>
+						Dependency Injection decreases coupling between a class and its dependency.
+					</li>
+					<li>
+						Dependency injection can be used to externalize a system's configuration details into configuration files allowing the system
+						to be reconfigured without recompilation.
+					</li>
+					<li>
+						Clients that are more independent and that are easier to unit test in isolation using stubs or mock objects that simulate
+						other objects not under test.
+					</li>
+				</ul>
+			</section>
+
+			<section>
+
+				<h3>Wikipedia - Advantages distilled</h3>
+				<ul>
+					<li>
+						Dependency injection allows a client to remove all knowledge of a concrete implementation that it needs to use. This helps
+						isolate the client from the impact of design changes and defects. It promotes reusability, testability and maintainability.
+					</li>
+					<li>
+						Reduction of boilerplate code in the application objects since all work to initialize or set up dependencies is handled by
+						a provider component.
+					</li>
+				</ul>
+
+			</section>
+
+			<section>
+
+				<h3>Advantages</h3>
+				<ul>
+					<li>
+						Large scale refactorings are usually impossible(google uses a single repository for all its product to make refactorings
+						possible). Since Di improve decoupling, a lot of refactorings are safe (refactorings involving constructor/factory
+						parameters, factory names, concrete types details)
+					</li>
+					<li>
+						Di encourage programming using contracts instead of relaying on specific implementation details
+					</li>
+				</ul>
+
+			</section>
+
+			<section>
+				<h3>xml era runtime errors kind</h3>
+				<ul>
+					<li>type errors (ClassCastException)</li>
+					<li>typos (ClassNotFoundException, NullPointerException)</li>
+					<li>incomplete configuration (NullPointerException; BeanNotFoundError)</li>
+					<li>duplicated configuration</li>
+				</ul>
+			</section>
+
+			<section>
+				<h3>the annotations era</h3>
+			</section>
+
+			<section>
+				<h3>Guice (2007) - Spring 2.5 (2008) - jsr 330</h3>
+				<p>replace xml config with java annotations</p>
+				<pre><code data-code="/src/web/resources/sample.java" data-trim></code></pre>
+			</section>
+
+			<section>
+				<h3>runtime errors kind</h3>
+				<ul>
+					<li>incomplete configuration (NullPointerException; BeanNotFoundError)</li>
+					<li>duplicated configuration</li>
+				</ul>
+			</section>
+
+			<section>
+				<h3>the no-container era</h3>
+				<h5>(alias the code generation era)</h5>
+			</section>
+
+			<section>
+				<h3>Dagger(2011) - MacWire(2013)</h3>
+				<ul>
+					<li>peform full object(service) graph validation at compile time</li>
+					<li>most of the responsabilities of the container(injector) are replaced by ad hoc generated code / macro</li>
+				</ul>
+			</section>
+
+			<section>
+				<h3>macro-di(2016)</h3>
+				<p>why?</p>
+				<ul>
+					<li>dagger does not work with scala idioms</li>
+					<li>mac-wire offer an atypical api for ioc, and suggest subtyping when organizing modules</li>
+				</ul>
+			</section>
+
+			<section>
+				<h3>mac wire (sample)</h3>
+				<pre><code data-code="/src/web/resources/macwire/ControllerModule.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<h3>mac wire (sample)</h3>
+				<pre><code data-code="/src/web/resources/macwire/DaoModule.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<h3>mac wire (sample)</h3>
+				<pre><code data-code="/src/web/resources/macwire/DatabaseModule.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<h3>mac wire (sample)</h3>
+				<pre><code data-code="/src/web/resources/macwire/AppApplicationLoader.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<h3>macro-di</h3>
+				<ul>
+					<li>every non primitive value can be used as a module</li>
+					<li>every public top level value/method in a module is a service</li>
+					<li>every module is also a service</li>
+					<li>IOC.get is the injector</li>
+				</ul>
+			</section>
+
+			<section>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module1.scala" data-trim></code></pre>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example1.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>macro-di can also create new instances of a type using values from modules</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example2.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>In the previouse example we created a Comp1 instance using its primary constructor. It is possible to customize this
+					behaviour adding a factory method on a module</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module3.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example3.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>macro-di is a implemented as a scala macro and it generates code at compile time</p>
+				<p>in Example2.scala</p>
+				<pre><code>val i1 = IOC.get[Comp1](Module1, new ModuleClass1(true))</code></pre>
+				<p>will be translated in something very similar to</p>
+				<pre><code>val i1 = new Comp1(Module1.a, new ModuleClass1(true).text)</code></pre>
+			</section>
+
+			<section>
+				<p>instead in Example3.scala</p>
+				<pre><code>val i1 = IOC.get[Comp1](Module1, new ModuleClass1(true), Module3)</code></pre>
+				<p>will be translated in something very similar to</p>
+				<pre><code>val i1 = Module3.createComp1(new ModuleClass1(true))</code></pre>
+			</section>
+
+			<section>
+				<p>However in the following example</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module4.scala" data-trim></code></pre>
+				<p>we get a compile time error</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example4.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>One difference from most other di framework is that this code doesnt fail for the duplication but fails since the client
+					is asking for a <b>single Comp1</b> instance.</p>
+			</section>
+
+			<section>
+				<p>indeed following code will work as expected:</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example4A.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<h3>multi bindings</h3>
+			</section>
+
+			<section>
+				<p>macro-di gives you a way to get all instances of a particular type inside your modules</p>
+			</section>
+
+			<section>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module5.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example5.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<h3>bind</h3>
+			</section>
+
+			<section>
+				<p>Sometimes you need to introduce a factory method just to specify that a trait will be implemented by some class</p>
+			</section>
+
+			<section>
+				<p>Example</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module6.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>Example</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example6.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>For those cases macro-di provides a shortcut, <b>Bind</b></p>
+			</section>
+
+			<section>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module6A.scala" data-trim></code></pre>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example6A.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>this has the benefit of further decoupling the trait from its specific constructor details</p>
+			</section>
+
+			<section>
+				<p>Bind can also be used to depend on functionalities implemented by the IOC container</p>
+			</section>
+
+			<section>
+				<h3>whhhaattt!??</h3>
+			</section>
+
+			<section>
+				<p>Lets consider the code</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module9.scala" data-trim></code></pre>
+				<p>With Module9 we cant create a House instance, we are missing a string</p>
+
+				<pre><code>
+[error] src\main\scala\com\github\gdefacci\di\sample\Example9.scala:7: could not find a binding for String
+[error] resolving com.github.gdefacci.di.sample.Person
+[error] resolving com.github.gdefacci.di.sample.House
+[error]   val hf1 = IOC.get[House](Module9, Module9A)
+				</code></pre>
+			</section>
+
+			<section>
+				<p>In pratice having a string instance we could get an House instance back. Lets state this contract</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module9A.scala" data-trim></code></pre>
+				<p>Here Bind is employed to ask macro-di to implement the trait HouseFactory</p>
+			</section>
+
+			<section>
+				<p>this can be used directly</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example9.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>or a component can depend upon:<p/>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module9B.scala" data-trim></code></pre>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example9B.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>And you dont have to use ad-hoc trait, you can use a function</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module9C.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example9C.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<h3>ids</h3>
+			</section>
+
+			<section>
+				<p>macro-di support <b>@Named</b> and <b>@Qualifier</b> annotations as described in jsr-330 when those annotations are used
+					inside a module (outside modules those annotations are ignored)</p>
+			</section>
+
+			<section>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module8.scala" data-trim></code></pre>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example8.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<h3>mudules container</h3>
+			</section>
+
+			<section>
+				<p>Sometimes it is useful to group up some unrelated modules in larger one, to avoid clients dealing with every single module.
+					To create a module that contains other modules you have to extend ModulesContainer:</p>
+			</section>
+
+			<section>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module10.scala" data-trim></code></pre>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Module10Container.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/Example10.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<h3>scopes</h3>
+			</section>
+
+			<section>
+				<p>macro-di support only Singleton scope and Factory(default) scope</p>
+			</section>
+
+			<section>
+				<h5>no session scope?</h5>
+				<h3>WTF!?</h3>
+			</section>
+
+			<section>
+				<p>macro-di offer however an alternative to session like scopes, let's explore it</p>
+			</section>
+
+			<section>
+				<p>Let's say there's a Session class on which part of you functionalities (MyService) indirectly depends upon. Session has
+					to be created in a Servlet using HttpSession</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/session/model.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>We'd like to define our servlet like</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/session/MyServlet.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>and ideally</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/session/ServletApp.scala" data-trim></code></pre>
+			</section>
+
+			<section>
+				<p>how to glue it all?</p>
+				<pre><code data-code="/src/main/scala/com/github/gdefacci/di/sample/session/AppModule.scala" data-trim></code></pre>
+			</section>
+
+		</div>
+	</div>
+
+	<script src="lib/js/head.min.js"></script>
+	<script src="js/reveal.js"></script>
+
+	<script>
+			// More info https://github.com/hakimel/reveal.js#configuration
+			Reveal.initialize({
+				history: true,
+
+				// More info https://github.com/hakimel/reveal.js#dependencies
+				dependencies: [
+					{ src: 'plugin/markdown/marked.js' },
+					{ src: 'plugin/markdown/markdown.js' },
+					{ src: 'plugin/notes/notes.js', async: true },
+				  	{ src: 'plugin/externalcode/externalcode.js', condition: function() { return !!document.querySelector( '[data-code]' ); } },
+          			{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } },
+
+				]
+			});
+		</script>
+</body>
+
+</html>
