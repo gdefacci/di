@@ -16,7 +16,7 @@ class MapOfBuffers[K, V] private (private val state: collection.mutable.Map[K, B
 
   def ++=(vs: Seq[(K, V)]): Unit = vs.foreach { case (k, v) => this += (k, v) }
 
-  def ++=(k: K, vs: Seq[V]): Unit = state.get(k) match {
+  private def ++=(k: K, vs: Seq[V]): Unit = state.get(k) match {
     case None => state += (k -> vs.toBuffer)
     case Some(buff) => state += (k -> (buff ++ vs))
   }
@@ -27,14 +27,8 @@ class MapOfBuffers[K, V] private (private val state: collection.mutable.Map[K, B
 
   def copy(): MapOfBuffers[K, V] = {
     val mp1 = collection.mutable.Map.empty[K, Buffer[V]]
-    mp1 ++= state
+    mp1 ++= state.map { case (k, bf) => k -> bf.clone() }
     new MapOfBuffers[K, V](mp1)
-  }
-
-  def ++(othr: MapOfBuffers[K, V]): MapOfBuffers[K, V] = {
-    val r = copy()
-    r ++= othr
-    r
   }
 
   def find(kid: K, typPredicate: V => Boolean): Seq[V] =
