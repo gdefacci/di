@@ -3,6 +3,7 @@ package com.github.gdefacci.di.macrodef
 import language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 import com.github.gdefacci.di.runtime.ModulesContainer
+import scala.util.control.NonFatal
 
 private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with TypeResolverMixin[C] with DagNodeOrRefFactory[C] with DagToExpr[C] {
 
@@ -105,7 +106,11 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     val dag = typeResolver.resolveDagNodeOrRef(Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos), Nil)
 
     val dagExpr = dagToExpr(dag)
+    try {
     context.typecheck(dagExpr.toTree)
+    } catch {
+      case NonFatal(e) => context.abort(context.enclosingPosition, e.getMessage + "generating code \n" + show(dagExpr.toTree))
+    }
   }
 
 }
