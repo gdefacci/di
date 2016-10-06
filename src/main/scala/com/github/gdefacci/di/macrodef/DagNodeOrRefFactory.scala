@@ -28,6 +28,17 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     $v
     """)
     Leaf(DagNode.value(kind, initialization, v,  typ, v.pos))  }
+  
+  def outboundParameterRef(knd:Kind, par:Symbol):Ref = {
+    val parTyp = par.info match {
+      case TypeRef(pre, k, args) if k == definitions.ByNameParamClass => 
+        assert(args.length==1)
+        args.head
+      case _ => par.info
+    }
+    
+    Ref(knd, parTyp, par.pos)
+  }
 
   private def paramListsDags(paramLists:List[List[Symbol]]) = 
     paramLists.flatMap(pars => pars.map { par =>
@@ -35,7 +46,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
       if (knd.ids.size > 1) {
         context.abort(par.pos, "parameters must have at most one identifier annotation")
       }
-      Leaf[DagNodeOrRef](Ref(Kind(knd.ids.head, knd.scope), par.info, par.pos))
+      Leaf[DagNodeOrRef](outboundParameterRef(Kind(knd.ids.head, knd.scope), par))
     })
     
   def methodDag(container: Dag[DagNodeOrRef],
@@ -61,6 +72,5 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     Node[DagNodeOrRef](DagNode.constructorCall(knd, exprType, constructorMethod, members), parametersDags)
   }
 
-  def parameterDag(par:Symbol, knd:Kind): Dag[DagNode]  =
-    Leaf[DagNode](DagNode.value(knd, Nil, q"${par.asTerm.name}", par.info, par.pos))
+  
 }

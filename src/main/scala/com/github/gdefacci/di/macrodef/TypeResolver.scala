@@ -154,7 +154,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
 
       val primaryConstructor = membersSelect.getPrimaryConstructor(typ)
       val primaryConstrArgs = primaryConstructor.map(_.paramLists.flatten).getOrElse(Nil).map { par =>
-        resolveDagNodeOrRef(Ref(Kind.default, par.info, par.pos), Nil)
+        resolveDagNodeOrRef(outboundParameterRef(Kind.default, par), Nil)
       }
 
       val membersPairs = membersSelect.abstractMembers(typ).map(mthd => mthd -> implementMethod(mthd))
@@ -184,12 +184,15 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         typ,
         typ.typeSymbol.pos), primaryConstrArgs ++ membersPairs.map(_._2))
     }
+    
+    private def inboundParameterDag(par:Symbol, knd:Kind): Dag[DagNode]  =
+      Leaf[DagNode](DagNode.value(knd, Nil, q"${par.asTerm.name}", par.info, par.pos))
 
     private def implementMethod(m: MethodSymbol): Dag[DagNode] = {
       val parametersBindings: Seq[(Id, Dag[DagNodeOrRef])] = m.paramLists.flatMap { pars =>
         pars.flatMap { par =>
           val knd = kindProvider(par)
-          knd.ids.map(id => id -> parameterDag(par, Kind(id, knd.scope)))
+          knd.ids.map(id => id -> inboundParameterDag(par, Kind(id, knd.scope)))
         }
       }
       val typ = m.returnType

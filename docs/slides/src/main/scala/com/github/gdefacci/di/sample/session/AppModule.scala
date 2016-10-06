@@ -8,7 +8,7 @@ object AppModule {
 
   def getUser(s:Session) = s.user
 
-  val sessionReader = (httpSession:HttpSession) => {
+  val sessionReader: HttpSession => Try[Session] = (httpSession:HttpSession) => {
     for {
       usr <- Try(httpSession.getAttribute("user").asInstanceOf[User])
       data <- Try(httpSession.getAttribute("appData").asInstanceOf[AppData])

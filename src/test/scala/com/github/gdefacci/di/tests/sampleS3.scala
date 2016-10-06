@@ -18,4 +18,8 @@ object samples3 {
     val bindHouseFactory = Bind.bind[String => House]
 
   }
+  
+  object ByName {
+    def aString(a: => Int) = a.toString
+  }
 }

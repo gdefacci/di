@@ -162,7 +162,7 @@ class ConstructorTests extends FunSuite {
 
     assert(service.service.repository == service.service1.repository)
   }
-  
+
   test("singleton polymorphic") {
     import samples2._
 
@@ -170,14 +170,14 @@ class ConstructorTests extends FunSuite {
     assert(gbc.a == gbc.c)
     assert(gbc.b.v == module8.b)
   }
-  
+
   test("multi integers") {
 
     import MultiModule._
     assert(IOC.get[Seq[Int]](Mod1, Mod2, Mod3).toSet == Set(Mod1.i1, Mod1.i2, Mod2.i3, Mod3.i455))
 
   }
-  
+
   test("multi integers modules container") {
 
     import MultiModule._
@@ -193,19 +193,19 @@ class ConstructorTests extends FunSuite {
     assert(seq2.toSet == Set(NMod1.i1, NMod2.i1))
 
   }
-  
+
   test("multi bind") {
 
     import MultiModule._
     val traits1 = IOC.get[Seq[Trait1]](NModBind)
     assert(traits1.size == 2)
     assert(traits1.exists {
-      case _:Trait1ImplA => true
-      case _=> false
+      case _: Trait1ImplA => true
+      case _ => false
     })
     assert(traits1.exists {
-      case _:Trait1ImplB => true
-      case _=> false
+      case _: Trait1ImplB => true
+      case _ => false
     })
   }
 
@@ -239,70 +239,86 @@ class ConstructorTests extends FunSuite {
     assert(Pippo("Pippy", 27) == p2)
 
   }
-  
+
   test("provider with implicit param") {
     import samples1._
 
     val txt = IOC.get[String](ModImplicit1)
-    
+
     assert(txt == "1true")
   }
-  
+
   test("module with super types") {
     import samples1._
 
     val txt = IOC.get[String](ModImplicit1Subtyping)
-    
+
     assert(txt == "1true")
   }
-  
- test("class with implicit param") {
+
+  test("class with implicit param") {
     import samples1._
 
     val txt = IOC.get[ClImplcit](ModImplicit1).text
-    
+
     assert(txt == "1true1true")
   }
- 
- test("polimorphic constructor") {
-   import samples1._
 
-   val mod = new Cl1A
-   val (i,txt,b) = IOC.get[(Int,String,Boolean)](mod)
+  test("polimorphic constructor") {
+    import samples1._
 
-   assert(b == mod.f)
-   assert(txt == mod.h)
-   assert(i == 1333)
-   
- }
+    val mod = new Cl1A
+    val (i, txt, b) = IOC.get[(Int, String, Boolean)](mod)
 
- test("polimorphic constructor 1") {
-   import samples1._
+    assert(b == mod.f)
+    assert(txt == mod.h)
+    assert(i == 1333)
 
-   val bpc = IOC.get[BibolyClient](ModBipoly, "abba")
+  }
 
-   assert(bpc.bi.a == true)
-   assert(bpc.bi.b == "abba")
-   
- }
- 
- test("Modules Container") {
-   import samples1._
+  test("polimorphic constructor 1") {
+    import samples1._
 
-   val user = IOC.get[User](UserModule)
-   
-   assert(user.admin == UserModule3.isAdmin)
-   assert(user.name == UserModule2.name)
-   assert(user.id == UserModule.anInt)
-   
- }
- 
- test("ioc dependency 1") {
-   import samples3._
+    val bpc = IOC.get[BibolyClient](ModBipoly, "abba")
 
-   val houseFactory = IOC.get[String => House](Module9, Module9A)
-   
-   assert(houseFactory("pippo") == House(Person("pippo", 33)))
- }
+    assert(bpc.bi.a == true)
+    assert(bpc.bi.b == "abba")
+
+  }
+
+  test("Modules Container") {
+    import samples1._
+
+    val user = IOC.get[User](UserModule)
+
+    assert(user.admin == UserModule3.isAdmin)
+    assert(user.name == UserModule2.name)
+    assert(user.id == UserModule.anInt)
+
+  }
+
+  test("ioc dependency 1") {
+    import samples3._
+
+    val houseFactory = IOC.get[String => House](Module9, Module9A)
+
+    assert(houseFactory("pippo") == House(Person("pippo", 33)))
+  }
+
+  test("ioc dependency 0") {
+    import samples3._
+
+    val r = IOC.get[() => Int](3)
+
+    assert(r() == 3)
+  }
+
+  test("by name dependency") {
+    import samples3._
+
+    val r = IOC.get[String](ByName, 3)
+
+    assert(r == "3")
+  }
 
 }
