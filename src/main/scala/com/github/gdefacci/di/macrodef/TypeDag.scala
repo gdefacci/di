@@ -107,9 +107,9 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
     val dagExpr = dagToExpr(dag)
     try {
-    context.typecheck(dagExpr.toTree)
+      context.typecheck(dagExpr.toTree)
     } catch {
-      case NonFatal(e) => context.abort(context.enclosingPosition, e.getMessage + "generating code \n" + show(dagExpr.toTree))
+      case NonFatal(e) => context.abort(context.enclosingPosition, e.getMessage + "\ngenerating code \n" + show(dagExpr.toTree))
     }
   }
 
