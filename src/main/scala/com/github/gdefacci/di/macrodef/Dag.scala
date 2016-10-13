@@ -39,6 +39,37 @@ private[di] object Dag {
   def visit[T](d: Dag[T]): Seq[Dag[T]] = {
     visitDagInternal(d, MSet.empty)
   }
+  
+  def fold[T, ACC](dag:Dag[T], zero:ACC)(f:(ACC, Dag[T]) => ACC) :ACC= {
+    val z1 = dag.inputs.foldLeft(zero) { (acc, i) =>
+      fold(i, acc)(f)
+    }
+    f(z1, dag)
+  }
+  
+  def mapValues[A, ID, B](d:Dag[A], keyf:A => ID)(f:(Dag[A], Seq[B]) => B) = {
+    val mp = fold[A, Map[ID, B]](d, Map.empty) { (acc, dg) =>
+      val k = keyf(dg.value)
+      acc.get(k) match {
+        case Some(_) => acc
+        case None =>
+          val v = f(dg, dg.inputs.map { dg =>
+            acc(keyf(dg.value))
+          })
+          acc + (k -> v)
+      }
+    }
+    mp(keyf(d.value))
+  }
+  
+  def foldDistinct[T, ID, ACC](dag:Dag[T], keyf:T => ID, zero:ACC)(f:(ACC, Dag[T]) => ACC) :ACC= {
+    fold(dag, Set.empty[ID] -> zero) { (acc0, i) => 
+      val (visited, acc) = acc0
+      val k= keyf(i.value)
+      if (visited.contains(k)) acc0
+      else (visited + k) -> f(acc, i)        
+    }._2
+  }
 
   private def visitDagInternal[T](d: Dag[T], visited: MSet[T]): Seq[Dag[T]] = {
     if (visited.contains(d.value)) Nil

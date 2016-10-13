@@ -30,6 +30,10 @@ private[di] trait DagNodes[C <: Context] {
   }
 
   sealed abstract case class DagNode(id: Int) extends DagNodeOrRef {
+    def name:String
+    
+//    def singletonName:TermName
+    
     def providerSource: ProviderSource
     def invoke(inputs: Seq[Tree]): Tree
     def initialization: Seq[Tree] => Seq[Tree]
@@ -50,6 +54,7 @@ private[di] trait DagNodes[C <: Context] {
     private final class DagNodeImpl private[DagNode] (
         lazyProviderSource: => ProviderSource,
         val kind: Kind,
+        val name:String,
         val description: String,
         val initialization: Seq[Tree] => Seq[Tree],
         val invoker: Seq[Tree] => Tree,
@@ -66,14 +71,15 @@ private[di] trait DagNodes[C <: Context] {
     def apply(
       providerSource: ProviderSource,
       kind: Kind,
+      name:String,
       description: String,
       initialization: Seq[Tree] => Seq[Tree],
       invoker: Seq[Tree] => Tree,
       typ: Type,
-      sourcePos: Position): DagNode = new DagNodeImpl(providerSource, kind, description, initialization, invoker, typ, sourcePos)
+      sourcePos: Position): DagNode = new DagNodeImpl(providerSource, kind, name, description, initialization, invoker, typ, sourcePos)
 
     def value(kind: Kind, initialization: Seq[Tree], value: Tree, typ: Type, sourcePos: Position) = 
-      apply(ProviderSource.ValueSource, kind, s"$value", trees => initialization, trees => value, typ, sourcePos)
+      apply(ProviderSource.ValueSource, kind, s"$value", s"$value", trees => initialization, trees => value, typ, sourcePos)
     
 
     def methodCall(kind: Kind, containerTermName: Option[TermName], method: Symbol) = {
@@ -81,20 +87,11 @@ private[di] trait DagNodes[C <: Context] {
       val providerSource = new ProviderSource.MethodSource(method.asMethod)
       val mthdName = method.name.decodedName.toString
       val description = s"${method.owner.name}.${method.name}"
-      if (kind.scope != SingletonScope) {
-        apply(providerSource, kind, description,
+        apply(providerSource, kind, mthdName, description, 
           trees => Nil,
           inputs => reflectUtils.methodCall(containerTermName, methodSymbol, inputs),
           typ = methodSymbol.returnType,
           sourcePos = method.pos)
-      } else {
-        val singletonName = TermName(context.freshName(s"singleton${mthdName}"))
-        apply(providerSource, kind, description,
-          inps => Seq(q"""val ${singletonName} = ${reflectUtils.methodCall(containerTermName, methodSymbol, inps)}"""),
-          inps => q"$singletonName",
-          methodSymbol.returnType,
-          methodSymbol.pos)
-      }
     }
 
     def constructorCall(kind: Kind, typ: Type, constructor: MethodSymbol, members: Seq[Tree]): DagNode = {
@@ -105,17 +102,7 @@ private[di] trait DagNodes[C <: Context] {
       }
       val providerSource = new ProviderSource.ConstructorSource(constructor)
       val typName = typ.typeSymbol.name.decodedName.toString
-      if (kind.scope != SingletonScope) {
-        apply(providerSource, kind, s"$constructor", trees => Nil, invoker, typ, constructor.pos)
-      } else {
-        val singletonName = TermName(context.freshName(s"singleton${typName}"))
-        apply(providerSource, kind,
-            s"singleton${typName}",
-            inps => Seq(q"""val ${singletonName} = ${invoker(inps)}"""),
-            inps => q"$singletonName",
-            constructor.returnType,
-            constructor.pos)
-      }
+        apply(providerSource, kind, typName, s"$constructor", trees => Nil, invoker, typ, constructor.pos)
     }
 
   }
@@ -190,20 +177,12 @@ private[di] trait DagNodes[C <: Context] {
           val description = s"$method[${substTypes.mkString(", ")}]"
           val invoker:Seq[Tree] => Tree = { args => reflectUtils.methodCall(containerTermName, method, substTypes, args) }
           
-          val nd = if (kind.scope != SingletonScope) {
-            DagNode(providerSource, kind, description,
+          val nd =
+            DagNode(providerSource, kind, method.name.toString, description,
               initialization = _ => Nil,
               invoker = invoker,
               concreteType,
               method.pos)
-          } else {
-            val singletonName = TermName(context.freshName(s"singleton${method.name}"))
-            DagNode(providerSource, kind, s"singleton$description",
-                inps => Seq(q"""val ${singletonName} = ${invoker(inps)}"""),
-                inps => q"$singletonName",
-                concreteType,
-                method.pos)
-          }
           
           Node[DagNodeOrRef](nd, dagInputs)
         }

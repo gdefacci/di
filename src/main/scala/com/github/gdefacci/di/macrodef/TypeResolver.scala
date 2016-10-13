@@ -114,6 +114,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       val nd = DagNode(new ProviderSource.AllbindingsSource(itemType.typeSymbol.asType),
         Kind.default,
         s"allBindings$itemType",
+        s"allBindings$itemType",
         inps => Nil,
         inps => q"new com.github.gdefacci.di.runtime.AllBindings[$itemType]( List[$itemType](..$inps) )",
         typ, pos)
@@ -141,6 +142,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       Node(DagNode(
         ProviderSource.ValueSource,
         kind,
+        resType.typeSymbol.name.toString,
         funTyp.toString,
         _ => Nil,
         deps => {
@@ -162,6 +164,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       Node(DagNode(
         ProviderSource.ValueSource,
         kind,
+        typ.typeSymbol.name.toString,
         typ.typeSymbol.fullName,
         _ => Nil,
         deps => {

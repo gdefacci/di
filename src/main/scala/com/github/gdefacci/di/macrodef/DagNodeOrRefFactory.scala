@@ -17,18 +17,6 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     }
   }
   
-  private def getTyp(v:Tree) = {
-    if (v.tpe != null) v.tpe
-    else context.typecheck(q"$v", context.TYPEmode).tpe
-  }
-
-  def valueDag[N >: DagNode <: DagNodeOrRef](initialization:Seq[Tree], v:Tree, kind:Kind):Dag[N] = {
-    val typ = getTyp(q"""
-    ..$initialization
-    $v
-    """)
-    Leaf(DagNode.value(kind, initialization, v,  typ, v.pos))  }
-  
   def outboundParameterRef(knd:Kind, par:Symbol):Ref = {
     val parTyp = par.info match {
       case TypeRef(pre, k, args) if k == definitions.ByNameParamClass => 
