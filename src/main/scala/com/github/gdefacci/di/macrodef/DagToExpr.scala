@@ -9,7 +9,7 @@ private[di] trait DagToExpr[C <: Context] { self: DagNodes[C] =>
   import context.universe._
   import collection.mutable.{Set => MSet}
   
-  private class DefaultDagToTree(val dagNode:SimpleDagNode, val dag: Dag[DagNode], val dependencies:Seq[DagToTree])  extends DagToTree{
+  private class DefaultDagToTree(val dagNode:SimpleDagNode, val dag: Dag[DagNode], val dependencies:Seq[DagToTree]) extends DagToTree {
 
     val id = dag.value.id
     private lazy val args = dependencies.map(_.value)
@@ -51,11 +51,7 @@ private[di] trait DagToExpr[C <: Context] { self: DagNodes[C] =>
         Nil
     }
     
-    private val (constrDeps, members) = dagNode.constructorAndMembersSplit(dependencies)
-    
-    private lazy val singletonMembersDeps = DagToTree.distinct(members).filter( d => dagNode.isParamIndependentSingleton(d.dag))
-    
-    lazy val initialization:Seq[Tree] = DagToTree.distinct(constrDeps ++ singletonMembersDeps).flatMap(_.localInitialization)
+    lazy val initialization:Seq[Tree] = dagNode.initialization(dependencies)
     
     lazy val value:Tree = if (isSingleton) q"${singletonName}" else invokeValue
           
