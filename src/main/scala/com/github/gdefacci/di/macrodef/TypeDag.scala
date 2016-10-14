@@ -31,7 +31,7 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
   private class ExprAlias(module: context.Tree, val typ:Type, val parent:Option[Dag[DagNodeOrRef]]) {
     def this(module: context.Tree, parent:Option[Dag[DagNodeOrRef]]) = this(module, module.tpe, parent)
     val termName = TermName(context.freshName(typ.typeSymbol.name.decodedName.toString))
-    val dag = alias(termName, module, typ, Kind.default, parent)
+    val dag = alias(termName, module, typ, Kind(Global, SingletonScope), parent)
   }
   
   def moduleDagNodeOrRefProviders(module: context.Expr[_]): Providers[DagNodeOrRef] = {
@@ -105,11 +105,11 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
     val dag = typeResolver.resolveDagNodeOrRef(Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos), Nil)
 
-    val dagExpr = dagToExpr(dag)
+    val dagTree = dagToTree(dag)
     try {
-      context.typecheck(dagExpr.toTree)
+      context.typecheck(dagTree)
     } catch {
-      case NonFatal(e) => context.abort(context.enclosingPosition, e.getMessage + "\ngenerating code \n" + show(dagExpr.toTree))
+      case NonFatal(e) => context.abort(context.enclosingPosition, e.getMessage + "\ngenerating code \n" + show(dagTree))
     }
   }
 

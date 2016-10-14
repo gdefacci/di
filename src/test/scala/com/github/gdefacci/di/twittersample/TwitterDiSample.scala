@@ -3,7 +3,9 @@ package twittersample
 
 object TwitterDiSample extends App {
 
-  val src = IOC.getSource[ApplicationComponentsProvider]()
+//  val src = IOC.getSource[ApplicationComponentsProvider](TwitterModule)
+  val src = IOC.getSource[ApplicationComponentsProvider](TwitterModule)
+//  val src1 = IOC.getSource[TweeterService1](TwitterModule1)
   val app = IOC.get[ApplicationComponentsProvider]()
   
   val grph = IOC.graph[ApplicationComponentImpl]("user")

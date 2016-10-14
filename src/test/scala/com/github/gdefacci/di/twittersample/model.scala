@@ -1,6 +1,7 @@
 package com.github.gdefacci.di.twittersample
 
 import javax.inject.Singleton
+import com.github.gdefacci.di.runtime.Bind
 
 case class OkHttpClient() {
   def sendRequest(req: String): Unit = {
@@ -49,9 +50,22 @@ object NetworkModule {
 }
 
 object TwitterModule {
-  @Singleton
-  def createTweeterApi(user: User, httpClient: OkHttpClient) = TwitterApi(user, httpClient)
+  
+  @Singleton val bindHttpClient = Bind.bind[OkHttpClient]
+  @Singleton def createTweeterApi(user: User, httpClient: OkHttpClient) = TwitterApi(user, httpClient)
 }
+
+case class TweeterService1(f:User => Tweeter)
+
+object TwitterModule1 {
+  
+  @Singleton val bindHttpClient = Bind.bind[OkHttpClient]
+  @Singleton def createTweeterApi(user: User, httpClient: OkHttpClient) = TwitterApi(user, httpClient)
+  
+  val fbind = Bind.bind[User => Tweeter]
+  
+}
+
 
 case class UserModule(user:User)
 

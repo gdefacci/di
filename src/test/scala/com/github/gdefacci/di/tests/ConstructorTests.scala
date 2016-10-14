@@ -320,5 +320,26 @@ class ConstructorTests extends FunSuite {
 
     assert(r == "3")
   }
+  
+  test("parameter independent singleton") {
+    import samples3._
+
+    val cf = IOC.get[CredFactory](ModuleCred)
+
+    val r1 = cf.f1(2)
+    val r2 = cf.f2(true)
+    
+    assert(r1.p == r2.p)
+  }
+  
+  test("parameter dependent singleton") {
+    import samples3._
+
+    val s1 = IOC.get[Serv1](ModuleServ1, true)
+
+    val s3 = s1.f("txt")
+    
+    assert(s3.a.s == s3.b.s)
+  }
 
 }

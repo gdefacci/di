@@ -153,53 +153,36 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     }
 
     private def implementsAbstractType(kind: Kind, typ: Type): Dag[DagNode] = {
+      
+      import AbstractTypeDag._
 
       val primaryConstructor = membersSelect.getPrimaryConstructor(typ)
-      val primaryConstrArgs = primaryConstructor.map(_.paramLists.flatten).getOrElse(Nil).map { par =>
-        resolveDagNodeOrRef(outboundParameterRef(Kind.default, par), Nil)
+      val constrPars = primaryConstructor.map(c => c -> c.paramLists.flatten).map { 
+        case (constr, pars) => new ConstructorCall(constr,  pars.map( par=> par -> resolveDagNodeOrRef(outboundParameterRef(Kind.default, par), Nil) ))
       }
-
-      val membersPairs = membersSelect.abstractMembers(typ).map(mthd => mthd -> implementMethod(mthd))
-
-      Node(DagNode(
-        ProviderSource.ValueSource,
-        kind,
-        typ.typeSymbol.name.toString,
-        typ.typeSymbol.fullName,
-        _ => Nil,
-        deps => {
-          val (inputs, mthds) = deps.splitAt(primaryConstrArgs.length)
-          val members = mthds.zip(membersPairs.map(_._1)).map {
-            case (impl, mthd) =>
-              val args = mthd.paramLists.map { pars =>
-                pars.map { par =>
-                  q"""${par.asTerm.name}: ${par.info}"""
-                }
-              }
-              q"""def ${mthd.name}(...${args}):${mthd.returnType} = { $impl }"""
-          }
-          primaryConstructor match {
-            case None => reflectUtils.newTrait(typ.typeSymbol, members)
-            case Some(constructor) =>
-              reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, inputs, members)
-          }
-        },
-        typ,
-        typ.typeSymbol.pos), primaryConstrArgs ++ membersPairs.map(_._2))
+      val pars =  membersSelect.abstractMembers(typ).map { mthd => 
+          val (pdgs, impl) = implementMethod(mthd)
+          new ImplementedMethod(mthd, pdgs, impl)
+      }
+      AbstractTypeDag.createDag(kind, typ, constrPars, pars)
     }
     
     private def inboundParameterDag(par:Symbol, knd:Kind): Dag[DagNode]  =
       Leaf[DagNode](DagNode.value(knd, Nil, q"${par.asTerm.name}", par.info, par.pos))
-
-    private def implementMethod(m: MethodSymbol): Dag[DagNode] = {
-      val parametersBindings: Seq[(Id, Dag[DagNodeOrRef])] = m.paramLists.flatMap { pars =>
-        pars.flatMap { par =>
+    
+    private def implementMethod(m: MethodSymbol): (List[(Symbol, Set[Dag[DagNode]])], Dag[DagNode]) = {
+      val pars0 = m.paramLists.flatMap { pars =>
+        pars.map { par =>
           val knd = kindProvider(par)
-          knd.ids.map(id => id -> inboundParameterDag(par, Kind(id, knd.scope)))
+          par -> knd.ids.map(id => id -> inboundParameterDag(par, Kind(id, knd.scope)))
         }
       }
+      val pars = pars0.map {
+        case (par, nds) => par -> nds.map(_._2)
+      }
+      val parametersBindings = pars0.flatMap(_._2)
       val typ = m.returnType
-      resolveSeparate(typ, parametersBindings)
+      pars -> resolveSeparate(typ, parametersBindings)
     }
 
     private def resolveSeparate(typ: Type, parametersBindings: Seq[(Id, Dag[DagNodeOrRef])]): Dag[DagNode] = {
