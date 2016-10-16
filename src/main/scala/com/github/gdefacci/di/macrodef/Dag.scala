@@ -70,23 +70,7 @@ private[di] object Dag {
 
 }
 
-class DagConnections[T](pred: T => Boolean, current: MMap[Dag[T], Boolean] = MMap.empty[Dag[T], Boolean]) {
-  
-  def isConnected(dag: Dag[T]): Boolean = {
-    current.get(dag) match {
-      case Some(v) => v
-      case None =>
-        val r =
-          if (pred(dag.value)) true
-          else dag.inputs.exists(inp => isConnected(inp))
-        current += (dag -> r)
-        r
-    }
-  }
-  
-}
-
-class NDagConnections[T, ID](pred: T => Boolean, keyf:T => ID, current: MMap[ID, Boolean] = MMap.empty[ID, Boolean]) {
+class DagConnections[T, ID](pred: T => Boolean, keyf:T => ID, current: MMap[ID, Boolean] = MMap.empty[ID, Boolean]) {
   
   def isConnected(dag: Dag[T]): Boolean = {
     val key = keyf(dag.value)

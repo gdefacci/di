@@ -13,7 +13,7 @@ private[di] trait DagToExpr[C <: Context] { self: DagNodes[C] =>
   
   def dagToTree[T](dag: Dag[DagNode]): Tree = {
     val r = dagToTreeFun(dag)
-    DagToExpression.expressionToTree(r.value)
+    genExpressionToTree(r.value)
   }
 
 }

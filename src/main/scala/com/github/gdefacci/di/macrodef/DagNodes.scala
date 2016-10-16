@@ -34,6 +34,22 @@ private[di] trait DagNodes[C <: Context] {
   }
 
   val Gen = new GenModel[Dag[DagNode], TermName, Tree]
+  
+  def genExpressionToTree(expr: Gen.Expression): Tree = {
+    expr match {
+      case v: Gen.Value => v.value
+      case v: Gen.Block =>
+        val decls = v.declarations.map { decl =>
+          val nm = decl.name
+          val v = genExpressionToTree(decl.expression)
+          q"val $nm = $v"
+        }
+        q"""
+        ..$decls
+        ${v.value}
+        """
+    }
+  }
 
   type DagToExpression = (Dag[DagNode], Seq[Dag[Gen.Expression]]) => Gen.Expression
 
@@ -54,102 +70,6 @@ private[di] trait DagNodes[C <: Context] {
 
     def const(tree: Tree): DagToExpression = { (dag, deps) =>
       new Gen.Value(dag, tree)
-    }
-
-    def expressionToTree(expr: Gen.Expression): Tree = {
-      expr match {
-        case v: Gen.Value => v.value
-        case v: Gen.Block =>
-          val decls = v.declarations.map { decl =>
-            val nm = decl.name
-            val v = expressionToTree(decl.expression)
-            q"val $nm = $v"
-          }
-          q"""
-          ..$decls
-          ${v.value}
-          """
-      }
-    }
-
-    def function(funTyp: Type, paramsDags: Seq[(Tree, Dag[DagNode])]): DagToExpression = { (dag, deps) =>
-      assert(deps.length == 1)
-
-      val toInboundParameters = {
-        val inboundParamsIds = paramsDags.map(_._2.value.id).toSet
-        new DagConnections[DagNode]({ dg =>
-          inboundParamsIds.contains(dg.id)
-        })
-      }
-
-      val res = deps.head
-      val isParamIndependentSingleton = (expr: Gen.Expression) => {
-        expr.source.value.kind.scope == SingletonScope && !toInboundParameters.isConnected(expr.source)
-      }
-
-      val (impl, decls) = Gen.partitionContent(expr => !isParamIndependentSingleton(expr))(res.value)
-      val pars = paramsDags.map(_._1)
-      decls match {
-        case Seq() => new Gen.Value(dag, q"(..$pars) => { ${expressionToTree(impl)} }")
-        case decls => new Gen.Block(dag, decls, q"(..$pars) => { ${expressionToTree(impl)} }")
-      }
-    }
-
-    class ConstructorCall(val constructor: MethodSymbol, val parametersDags: Seq[(Symbol, Dag[DagNode])])
-    class ImplementedMethod(val method: MethodSymbol, val parametersDags: Seq[(Symbol, Set[Dag[DagNode]])], val impl: Dag[DagNode])
-
-    //    def log(str: String) = context.warning(context.enclosingPosition, str)
-
-    def abstractType(typ: Type,
-      constructorCall: Option[ConstructorCall],
-      implementedMethods: Seq[ImplementedMethod]): DagToExpression = { (dag, deps) =>
-
-      val toInboundParameters = {
-        val inboundParamsIds = implementedMethods.flatMap(_.parametersDags.flatMap(_._2.map(_.value.id))).toSet
-        new DagConnections[DagNode]({ dg =>
-          inboundParamsIds.contains(dg.id)
-        })
-      }
-
-      val isParamIndependentSingleton = (d: Dag[DagNode]) => {
-        d.value.kind.scope == SingletonScope && !toInboundParameters.isConnected(d)
-      }
-
-      val constrParLen = constructorCall.map(_.parametersDags.length).getOrElse(0)
-
-      val (constrDeps, membDeps) = deps.splitAt(constrParLen)
-
-      val members = membDeps.zip(implementedMethods).map {
-        case (body, implMthd) =>
-          val mthd = implMthd.method
-          val args = mthd.paramLists.map { pars =>
-            pars.map { par =>
-              q"""${par.asTerm.name}: ${par.info}"""
-            }
-          }
-          val (impl, decls) = Gen.partitionContent(expr => !isParamIndependentSingleton(expr.source))(body.value)
-
-          val mthdTree = q"""def ${mthd.name}(...${args}):${mthd.returnType} = { 
-             ${expressionToTree(impl)} 
-          }"""
-
-          decls match {
-            case Seq() => new Gen.Value(dag, mthdTree)
-            case decls => new Gen.Block(dag, decls, mthdTree)
-          }
-      }
-
-      val allDecls = Gen.allDeclarations(constrDeps.map(_.value) ++ members, _.source.value.id)
-      val resValue = constructorCall match {
-        case None => reflectUtils.newTrait(typ.typeSymbol, members.map(_.value))
-        case Some(constrCall) =>
-          val constructor = constrCall.constructor
-          reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, constrDeps.map(_.value.value), members.map(_.value))
-      }
-      allDecls match {
-        case Seq() => new Gen.Value(dag, resValue)
-        case decls => new Gen.Block(dag, decls, resValue)
-      }
     }
 
     def singletonize(de: DagToExpression): DagToExpression = { (dag, deps) =>

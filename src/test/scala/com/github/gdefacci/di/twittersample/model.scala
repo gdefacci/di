@@ -3,7 +3,7 @@ package com.github.gdefacci.di.twittersample
 import javax.inject.Singleton
 import com.github.gdefacci.di.runtime.Bind
 
-case class OkHttpClient() {
+class OkHttpClient() {
   def sendRequest(req: String): Unit = {
     println(s"sending request $req")
   }

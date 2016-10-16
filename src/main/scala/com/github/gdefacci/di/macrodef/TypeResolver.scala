@@ -2,9 +2,9 @@ package com.github.gdefacci.di.macrodef
 
 import scala.reflect.macros.blackbox
 
-trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeOrRefFactory[C] =>
+trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeOrRefFactory[C] with DagToExpressionFactoryMixin[C] =>
 
-  import DagToExpression.{ ConstructorCall, ImplementedMethod }
+  import DagToExpressionFactory.{ ConstructorCall, ImplementedMethod }
 
   import context.universe._
 
@@ -13,6 +13,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
   class TypeResolver(
       mappings: Providers[DagNodeOrRef],
       dagProviders: MapOfBuffers[Id, Dag[DagNode]],
+      private val currentSingletons: MapOfBuffers[Id, Dag[DagNode]] = MapOfBuffers.empty,
       stack: collection.mutable.Queue[DagNodeOrRef] = collection.mutable.Queue.empty[DagNodeOrRef]) {
 
     private def error(msg: String) = {
@@ -35,7 +36,10 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
               resolveTargetRef(ref)
 
           }
-          if (dagProviders.find(id, nd => nd.value.typ <:< typ).isEmpty) dagProviders += (id, r)
+          if (dagProviders.find(id, nd => nd.value.typ <:< typ).isEmpty) {
+            if (r.value.kind.scope == SingletonScope) currentSingletons += (id, r)
+            dagProviders += (id, r)
+          }
           r
         case Seq(hd) =>
           hd
@@ -130,7 +134,6 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         Node[DagNode](nd, inputs.map(dg => resolveDagNodeOrRef(dg.value, dg.inputs)))
     }
 
-    //FunctionDagNodeFactory
     private def implementsFunction(kind: Kind, funTyp: Type, pos: Position): Dag[DagNode] = {
 
       val inpTypes = funTyp.typeArgs.init
@@ -146,7 +149,8 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       val ftsym = funTyp.typeSymbol
       val name: String = ftsym.name.toString
       val description = ftsym.fullName
-      Node(DagNode(ProviderSource.ValueSource, kind,description,name, funTyp, ftsym.pos, DagToExpression.function(funTyp, pars.zip(parametersDags))), res :: Nil)
+      Node(DagNode(ProviderSource.ValueSource, kind, name, description, funTyp, ftsym.pos, DagToExpressionFactory.function(funTyp, pars.zip(parametersDags))), 
+          res :: Nil)
     }
 
     private def implementsAbstractType(kind: Kind, typ: Type): Dag[DagNode] = {
@@ -163,10 +167,9 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       val name: String = tsym.name.toString
       val description = tsym.fullName
       val pos = tsym.pos
-      
-      Node(DagNode(ProviderSource.ValueSource, kind, description, name, typ, pos, DagToExpression.abstractType(typ, constrPars, pars)),
-        constrPars.map(_.parametersDags.map(_._2)).getOrElse(Nil) ++
-          pars.map(_.impl))
+
+      Node(DagNode(ProviderSource.ValueSource, kind, name, description, typ, pos, DagToExpressionFactory.abstractType(typ, constrPars, pars)),
+        constrPars.map(_.parametersDags.map(_._2)).getOrElse(Nil) ++ pars.map(_.impl))
     }
 
     private def inboundParameterDag(par: Symbol, knd: Kind): Dag[DagNode] =
@@ -192,7 +195,10 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       nmappings ++= parametersBindings
       val dagProviders = this.dagProviders.copy
 
-      new TypeResolver(nmappings, dagProviders, stack.clone()).resolveDagNodeOrRef(Ref(Kind(Global, DefaultScope), typ, typ.typeSymbol.pos), Nil)
+      val tr = new TypeResolver(nmappings, dagProviders,  MapOfBuffers.empty, stack.clone())
+      val res = tr.resolveDagNodeOrRef(Ref(Kind(Global, DefaultScope), typ, typ.typeSymbol.pos), Nil)
+      this.dagProviders ++= tr.currentSingletons
+      res
     }
 
   }

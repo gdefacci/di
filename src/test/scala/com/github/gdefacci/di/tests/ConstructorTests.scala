@@ -2,7 +2,6 @@ package com.github.gdefacci.di.tests
 
 import com.github.gdefacci.di.IOC
 import org.scalatest.FunSuite
-import com.github.gdefacci.di.tests.MultiModule.MultiIncompleteCl
 
 class ConstructorTests extends FunSuite {
 
@@ -321,7 +320,7 @@ class ConstructorTests extends FunSuite {
     assert(r == "3")
   }
   
-  test("parameter independent singleton") {
+  test("parameter independent singleton in trait") {
     import samples3._
 
     val cf = IOC.get[CredFactory](ModuleCred)
@@ -340,6 +339,17 @@ class ConstructorTests extends FunSuite {
     val s3 = s1.f("txt")
     
     assert(s3.a.s == s3.b.s)
+  }
+  
+  test("parameter independent singleton in function") {
+
+    import com.github.gdefacci.di.twittersample._
+    val ts = IOC.get[TweeterService1](TwitterModule1)
+
+    val cl1 = ts.f(User("")).api.httpClient
+    
+    assert(ts.client == cl1)
+    
   }
 
 }

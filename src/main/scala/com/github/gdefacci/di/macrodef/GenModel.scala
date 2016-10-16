@@ -65,10 +65,6 @@ class GenModel[S, N, V] {
         val decls = bl.declarations.partition(decl => pred(decl.expression))
         val (sat, skip) = partitionElements(decls._1, pred)
         new Block(bl.source, sat, bl.value) -> (decls._2 ++ skip)
-//      case bl: FunctionScope =>
-//        val decls = bl.declarations.partition(decl => pred(decl.expression))
-//        val (sat, skip) = partitionElements(decls._1, pred)
-//        new FunctionScope(bl.source, bl.inbound, sat, bl.value) -> (decls._2 ++ skip)
     }
   }
 
