@@ -15,7 +15,7 @@ private[di] trait DagToExpr[C <: Context] { self: DagNodes[C] =>
     private lazy val args = dependencies.map(_.value)
     
     private val isSingleton = dag.value.kind.scope == SingletonScope
-    private val invokeValue = dagNode.invoke(args)
+    private lazy val invokeValue = dagNode.invoke(args)
     
     private lazy val singletonName = TermName(context.freshName("singleton"+dag.value.name))
 
@@ -39,7 +39,7 @@ private[di] trait DagToExpr[C <: Context] { self: DagNodes[C] =>
     val id = dag.value.id
     
     private val isSingleton = dag.value.kind.scope == SingletonScope
-    private val invokeValue = dagNode.invoke(dependencies)
+    private lazy val invokeValue = dagNode.invoke(dependencies)
     
     private lazy val singletonName = TermName(context.freshName("singleton"+dag.value.name))
 
@@ -63,13 +63,21 @@ private[di] trait DagToExpr[C <: Context] { self: DagNodes[C] =>
   }
 
   
-  def dagToTree[T](dag: Dag[DagNode]): Tree = {
+  def dagToTree1[T](dag: Dag[DagNode]): Tree = {
     toTree(Dag.mapValues[DagNode, Int, DagToTree](dag, _.id)((d, inps) => 
       d.value match {
         case nd:SimpleDagNode =>  new DefaultDagToTree(nd, d, inps)
         case nd:AbstractTypeDagNode => new AbstractTypeDagToTree(nd, d, inps)
       }
     ))
+  }
+  
+  
+  val dagToTreeFun = Gen.fromDag[DagNode, Int](_.id, (d, inpts) => DagToExpression.singletonize(d.value.dagToExpression)(d, inpts)) _
+  
+  def dagToTree[T](dag: Dag[DagNode]): Tree = {
+    val r = dagToTreeFun(dag)
+    DagToExpression.expressionToTree(r.value)
   }
 
 }

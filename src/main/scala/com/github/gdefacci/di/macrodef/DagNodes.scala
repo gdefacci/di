@@ -2,6 +2,7 @@ package com.github.gdefacci.di.macrodef
 
 import scala.reflect.macros.blackbox.Context
 import java.util.concurrent.atomic.AtomicInteger
+import com.sun.javafx.fxml.expression.Expression
 
 private[di] trait DagNodes[C <: Context] {
   val context: C
@@ -37,9 +38,158 @@ private[di] trait DagNodes[C <: Context] {
     def description: String = s"Reference to type $typ"
   }
 
+  val Gen = new GenModel[Dag[DagNode], TermName, Tree]
+
+  type DagToExpression = (Dag[DagNode], Seq[Dag[Gen.Expression]]) => Gen.Expression
+
+  object DagToExpression {
+
+    def apply(termName: TermName, value: Tree): DagToExpression = { (dag, deps) =>
+      val decls = Gen.allDeclarations(deps.map(_.value), _.source.value.id)
+
+      val v = new Gen.Value(dag, value)
+      val decl = new Gen.Declaration(termName, v)
+      new Gen.Block(dag, decls :+ decl, q"$termName")
+    }
+
+    def apply(valuef: Seq[Tree] => Tree): DagToExpression = { (dag, deps) =>
+      val decls = Gen.allDeclarations(deps.map(_.value), _.source.value.id)
+      new Gen.Block(dag, decls, valuef(deps.map(_.value.value)))
+    }
+
+    def const(tree: Tree): DagToExpression = { (dag, deps) =>
+      new Gen.Value(dag, tree)
+    }
+
+    def expressionToTree(expr: Gen.Expression): Tree = {
+      expr match {
+        case v: Gen.Value => v.value
+        case v: Gen.Block =>
+          val decls = v.declarations.map { decl =>
+            val nm = decl.name
+            val v = expressionToTree(decl.expression)
+            q"val $nm = $v"
+          }
+          q"""
+          ..$decls
+          ${v.value}
+          """
+      }
+    }
+
+    def function(funTyp: Type, paramsDags: Seq[(Tree, Dag[DagNode])]): DagToExpression = { (dag, deps) =>
+      assert(deps.length == 1)
+      
+      val toInboundParameters = {
+        val inboundParamsIds = paramsDags.map(_._2.value.id).toSet
+        log(inboundParamsIds.mkString(",  "))
+        new DagConnections[DagNode]({ dg =>
+          val r = inboundParamsIds.contains(dg.id)
+          log(">>" + dg.id.toString()+" -- "+r)
+          r
+        })
+      }
+      
+      val res = deps.head
+      val isParamIndependentSingleton = (expr: Gen.Expression) => {
+        val r = expr.source.value.kind.scope == SingletonScope && !toInboundParameters.isConnected(expr.source)
+//        log("conns: "+expr.source.value.description+" - "+r+" - "+expr.source.inputs.map( d => d.value.id + "@" + d.value.description).mkString(", "))
+        r      }
+
+      val (impl, decls) = Gen.partitionContent(expr => !isParamIndependentSingleton(expr))(res.value)
+      log(decls.mkString(", "))
+      val pars = paramsDags.map(_._1)
+      decls match {
+        case Seq() => new Gen.Value(dag, q"(..$pars) => { ${expressionToTree(impl)} }")
+        case decls => new Gen.Block(dag, decls, q"(..$pars) => { ${expressionToTree(impl)} }")
+      }
+    }
+
+    class ConstructorCall(val constructor: MethodSymbol, val parametersDags: Seq[(Symbol, Dag[DagNode])])
+    class ImplementedMethod(val method: MethodSymbol, val parametersDags: Seq[(Symbol, Set[Dag[DagNode]])], val impl: Dag[DagNode])
+
+    def log(str: String) = context.warning(context.enclosingPosition, str)
+
+    def abstractType(typ: Type,
+      constructorCall: Option[ConstructorCall],
+      implementedMethods: Seq[ImplementedMethod]): DagToExpression = { (dag, deps) =>
+
+      val toInboundParameters = {
+        val inboundParamsIds = implementedMethods.flatMap(_.parametersDags.flatMap(_._2.map(_.value.id))).toSet
+        new DagConnections[DagNode]({ dg =>
+          val r = inboundParamsIds.contains(dg.id)
+          r
+        })
+      }
+
+      val isParamIndependentSingleton = (d: Dag[DagNode]) => {
+        d.value.kind.scope == SingletonScope && !toInboundParameters.isConnected(d)
+      }
+
+      val constrParLen = constructorCall.map(_.parametersDags.length).getOrElse(0)
+      val (constrDeps, membDeps) = deps.splitAt(constrParLen)
+
+      val members = membDeps.zip(implementedMethods).map {
+        case (body, implMthd) =>
+          val mthd = implMthd.method
+          val args = mthd.paramLists.map { pars =>
+            pars.map { par =>
+              q"""${par.asTerm.name}: ${par.info}"""
+            }
+          }
+          val (impl, decls) = Gen.partitionContent(expr => !isParamIndependentSingleton(expr.source))(body.value)
+
+          val mthdTree = q"""def ${mthd.name}(...${args}):${mthd.returnType} = { 
+             ${expressionToTree(impl)} 
+          }"""
+
+          decls match {
+            case Seq() => new Gen.Value(dag, mthdTree)
+            case decls => new Gen.Block(dag, decls, mthdTree)
+          }
+      }
+
+      val allDecls = Gen.allDeclarations(constrDeps.map(_.value) ++ members, _.source.value.id)
+      val resValue = constructorCall match {
+        case None => reflectUtils.newTrait(typ.typeSymbol, members.map(_.value))
+        case Some(constrCall) =>
+          val constructor = constrCall.constructor
+          reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, constrDeps.map(_.value.value), members.map(_.value))
+      }
+      allDecls match {
+        case Seq() => new Gen.Value(dag, resValue)
+        case decls => new Gen.Block(dag, decls, resValue)
+      }
+    }
+
+    def singletonize(de: DagToExpression): DagToExpression = { (dag, deps) =>
+      val r = de(dag, deps)
+      if (r.source.value.kind.scope == SingletonScope) singletonizeExpression(r)
+      else r
+    }
+
+    private def singletonizeExpression(e: Gen.Expression): Gen.Expression = {
+        val singletonName = TermName(context.freshName("singleton" + e.source.value.name))
+        e match {
+          case v: Gen.Value =>
+            new Gen.Block(v.source, new Gen.Declaration(singletonName, v) :: Nil, q"$singletonName")
+          case v: Gen.Block =>
+            val v1 = v.source.value
+            val newSource =
+              DagNode(v1.providerSource, v1.kind, v1.description, v1.name, _ => Nil, _ => ???, v1.typ, v1.sourcePos, DagToExpression.const(q""))
+
+            new Gen.Block(v.source, v.declarations :+ new Gen.Declaration(singletonName, new Gen.Value(Node(newSource, e.source.inputs), v.value)), q"$singletonName")
+        }
+        
+    }
+
+  }
+
   sealed abstract case class DagNode(id: Int) extends DagNodeOrRef {
     def name: String
     def providerSource: ProviderSource
+
+    def dagToExpression: DagToExpression
   }
 
   sealed abstract class SimpleDagNode(id: Int) extends DagNode(id) {
@@ -93,11 +243,12 @@ private[di] trait DagNodes[C <: Context] {
 
   object AbstractTypeDag {
 
-    final class AbstractTypeDagNodeImpl1 (
+    final class AbstractTypeDagNodeImpl1(
         val kind: Kind,
         val typ: Type,
-        initializer:Seq[DagToTree] => Seq[Tree],
-        invoker:Seq[DagToTree] => Tree) extends AbstractTypeDagNode(IdGen.next) {
+        initializer: Seq[DagToTree] => Seq[Tree],
+        invoker: Seq[DagToTree] => Tree,
+        val dagToExpression: DagToExpression) extends AbstractTypeDagNode(IdGen.next) {
 
       val name: String = typ.typeSymbol.name.toString
       val description = typ.typeSymbol.fullName
@@ -106,14 +257,20 @@ private[di] trait DagNodes[C <: Context] {
 
       val sourcePos: Position = typ.typeSymbol.pos
       assert(typ != null, s"could not infer type on tree $description")
-      
-      def initialization(dependencies: Seq[DagToTree]): Seq[Tree] = initializer(dependencies) 
-      
-      def invoke(deps: Seq[DagToTree]): Tree = invoker(deps) 
-        
+
+      def initialization(dependencies: Seq[DagToTree]): Seq[Tree] = initializer(dependencies)
+
+      def invoke(deps: Seq[DagToTree]): Tree = invoker(deps)
+
     }
 
   }
+
+  //  object DefaultToExpression extends ((DagNode,  Seq[Gen.Expression]) => Gen.Expression) {
+  //    
+  //    
+  //    
+  //  }
 
   object DagNode {
 
@@ -125,13 +282,15 @@ private[di] trait DagNodes[C <: Context] {
         val initialization: Seq[Tree] => Seq[Tree],
         invoker: Seq[Tree] => Tree,
         val typ: Type,
-        val sourcePos: Position) extends SimpleDagNode(IdGen.next) {
+        val sourcePos: Position,
+        val dagToExpression: DagToExpression) extends SimpleDagNode(IdGen.next) {
 
       assert(typ != null, s"could not infer type on tree $description")
 
       def invoke(inputs: Seq[Tree]): Tree = invoker(inputs)
 
       lazy val providerSource = lazyProviderSource
+
     }
 
     def apply(
@@ -142,10 +301,11 @@ private[di] trait DagNodes[C <: Context] {
       initialization: Seq[Tree] => Seq[Tree],
       invoker: Seq[Tree] => Tree,
       typ: Type,
-      sourcePos: Position): DagNode = new DagNodeImpl(providerSource, kind, name, description, initialization, invoker, typ, sourcePos)
+      sourcePos: Position,
+      dagToExpression: DagToExpression): DagNode = new DagNodeImpl(providerSource, kind, name, description, initialization, invoker, typ, sourcePos, dagToExpression)
 
-    def value(kind: Kind, initialization: Seq[Tree], value: Tree, typ: Type, sourcePos: Position) =
-      apply(ProviderSource.ValueSource, kind, s"$value", s"$value", trees => initialization, trees => value, typ, sourcePos)
+    def value(kind: Kind, initialization: Seq[Tree], value: Tree, typ: Type, sourcePos: Position, dagToExpression: DagToExpression) =
+      apply(ProviderSource.ValueSource, kind, s"$value", s"$value", trees => initialization, trees => value, typ, sourcePos, dagToExpression)
 
     def methodCall(kind: Kind, containerTermName: Option[TermName], method: Symbol) = {
       lazy val methodSymbol = method.asMethod
@@ -156,7 +316,8 @@ private[di] trait DagNodes[C <: Context] {
         trees => Nil,
         inputs => reflectUtils.methodCall(containerTermName, methodSymbol, inputs),
         typ = methodSymbol.returnType,
-        sourcePos = method.pos)
+        sourcePos = method.pos,
+        DagToExpression.apply(inputs => reflectUtils.methodCall(containerTermName, methodSymbol, inputs)))
     }
 
     def constructorCall(kind: Kind, typ: Type, constructor: MethodSymbol, members: Seq[Tree]): DagNode = {
@@ -167,7 +328,8 @@ private[di] trait DagNodes[C <: Context] {
       }
       val providerSource = new ProviderSource.ConstructorSource(constructor)
       val typName = typ.typeSymbol.name.decodedName.toString
-      apply(providerSource, kind, typName, s"$constructor", trees => Nil, invoker, typ, constructor.pos)
+      apply(providerSource, kind, typName, s"$constructor", trees => Nil, invoker, typ, constructor.pos,
+        DagToExpression(invoker))
     }
 
   }
@@ -247,7 +409,8 @@ private[di] trait DagNodes[C <: Context] {
               initialization = _ => Nil,
               invoker = invoker,
               concreteType,
-              method.pos)
+              method.pos,
+              DagToExpression(invoker))
 
           Node[DagNodeOrRef](nd, dagInputs)
         }

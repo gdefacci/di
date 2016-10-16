@@ -55,9 +55,6 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
       case (acc, membersSelect.BindInstance(member, abstractType, concreteType)) =>
         
         val knds = kindProvider(member)
-//        if (concreteType.isAbstract) {
-//          context.abort(member.pos, s"The second type parameter of Bind must be a concrete class, ${concreteType} is not")
-//        }
         acc.addMembers(knds.ids.toSeq.map(id => id -> Leaf[DagNodeOrRef](Ref(Kind(id, knds.scope), concreteType.asType.toType, member.pos))))
       
       case (acc, membersSelect.ModuleContainerBinding(member, typ)) =>

@@ -5,6 +5,7 @@ import scala.reflect.macros.blackbox
 trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeOrRefFactory[C] =>
 
   import AbstractTypeDag._
+  import DagToExpression.{ ConstructorCall, ImplementedMethod }
 
   import context.universe._
 
@@ -119,7 +120,8 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         s"allBindings$itemType",
         inps => Nil,
         inps => q"new com.github.gdefacci.di.runtime.AllBindings[$itemType]( List[$itemType](..$inps) )",
-        typ, pos)
+        typ, pos,
+        DagToExpression(inps => q"new com.github.gdefacci.di.runtime.AllBindings[$itemType]( List[$itemType](..$inps) )"))
 
       resolveDagNode(nd, insts)
     }
@@ -131,12 +133,28 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         Node[DagNode](nd, inputs.map(dg => resolveDagNodeOrRef(dg.value, dg.inputs)))
     }
 
+    //FunctionDagNodeFactory
     private def implementsFunction(kind: Kind, funTyp: Type, pos: Position): Dag[DagNode] = {
+
+      val inpTypes = funTyp.typeArgs.init
+      val parnames = 1.to(inpTypes.length).map(i => TermName(s"par$i"))
+      val pars = inpTypes.zip(parnames).map { case (inp, parName) => q"$parName:$inp" }
+      val parametersDags: Seq[Dag[DagNode]] = {
+        inpTypes.zip(parnames).map { case (inp, par) => Leaf(DagNode.value(Kind.default, Nil, q"$par", inp, pos, DagToExpression.const(q"$par"))) }
+      }
+      val res = {
+        val resultType = funTyp.typeArgs.last
+        resolveSeparate(resultType, parametersDags.map(nd => nd.value.kind.id -> nd))
+      }
+      Node(new AbstractTypeDagNodeImpl1(kind, funTyp, _ => ???, _ => ???, DagToExpression.function(funTyp, pars.zip(parametersDags))), res :: Nil)
+    }
+
+    private def implementsFunction_old(kind: Kind, funTyp: Type, pos: Position): Dag[DagNode] = {
       val inpTypes = funTyp.typeArgs.init
       val resType = funTyp.typeArgs.last
       val parnames = 1.to(inpTypes.length).map(i => TermName(s"par$i"))
       val pars = inpTypes.zip(parnames).map { case (inp, parName) => q"$parName:$inp" }
-      val nds = inpTypes.zip(parnames).map { case (inp, parName) => Leaf(DagNode.value(Kind.default, Nil, q"$parName", inp, pos)): Dag[DagNodeOrRef] }
+      val nds = inpTypes.zip(parnames).map { case (inp, parName) => Leaf(DagNode.value(Kind.default, Nil, q"$parName", inp, pos, DagToExpression.const(q"$parName"))): Dag[DagNodeOrRef] }
       val inpDags = nds.map(nd => nd.value.kind.id -> nd)
 
       val inpts = resolveSeparate(resType, inpDags) :: Nil
@@ -151,7 +169,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
           q"(..$pars) => ${deps.head}"
         },
         funTyp,
-        pos), inpts)
+        pos, ???), inpts)
     }
 
     private def implementsAbstractType(kind: Kind, typ: Type): Dag[DagNode] = {
@@ -165,13 +183,13 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         new ImplementedMethod(mthd, pdgs, impl)
       }
       val dnf = new AbstractTypeDagNodeFactory(typ, constrPars, pars)
-      Node(new AbstractTypeDagNodeImpl1(kind, typ, dnf.initializer, dnf.invoker), 
-          constrPars.map(_.parametersDags.map(_._2)).getOrElse(Nil) ++
-          pars.map(_.impl)) 
+      Node(new AbstractTypeDagNodeImpl1(kind, typ, dnf.initializer, dnf.invoker, DagToExpression.abstractType(typ, constrPars, pars)),
+        constrPars.map(_.parametersDags.map(_._2)).getOrElse(Nil) ++
+          pars.map(_.impl))
     }
 
     private def inboundParameterDag(par: Symbol, knd: Kind): Dag[DagNode] =
-      Leaf[DagNode](DagNode.value(knd, Nil, q"${par.asTerm.name}", par.info, par.pos))
+      Leaf[DagNode](DagNode.value(knd, Nil, q"${par.asTerm.name}", par.info, par.pos, DagToExpression.const(q"${par.asTerm.name}")))
 
     private def implementMethod(m: MethodSymbol): (List[(Symbol, Set[Dag[DagNode]])], Dag[DagNode]) = {
       val pars0 = m.paramLists.flatMap { pars =>
@@ -197,9 +215,9 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     }
 
   }
-  
-  private class ConstructorCall(val constructor: MethodSymbol, val parametersDags: Seq[(Symbol, Dag[DagNode])])
-  private class ImplementedMethod(val method: MethodSymbol, val parametersDags: Seq[(Symbol, Set[Dag[DagNode]])], val impl: Dag[DagNode])
+
+  //  class ConstructorCall(val constructor: MethodSymbol, val parametersDags: Seq[(Symbol, Dag[DagNode])])
+  //  class ImplementedMethod(val method: MethodSymbol, val parametersDags: Seq[(Symbol, Set[Dag[DagNode]])], val impl: Dag[DagNode])
 
   private class AbstractTypeDagNodeFactory(
       typ: Type,
@@ -248,6 +266,46 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
           val constructor = constrCall.constructor
           reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, inputs.map(_.value), members)
       }
+    }
+
+  }
+
+  private class FunctionDagNodeFactory(funTyp: Type, pos: Position) {
+
+    val inpTypes = funTyp.typeArgs.init
+    val parnames = 1.to(inpTypes.length).map(i => TermName(s"par$i"))
+    val pars = inpTypes.zip(parnames).map { case (inp, parName) => q"$parName:$inp" }
+    val parametersDags: Seq[Dag[DagNode]] = {
+      inpTypes.zip(parnames).map { case (inp, par) => Leaf(DagNode.value(Kind.default, Nil, q"$par", inp, pos, DagToExpression.const(q"$par"))) }
+    }
+
+    private lazy val toInboundParameters = {
+      val inboundParamsIds = parametersDags.map(_.value.id)
+      context.warning(pos, inboundParamsIds.mkString(", "))
+      new DagConnections[DagNode](dg => inboundParamsIds.contains(dg.id))
+    }
+
+    private def isParamIndependentSingleton(d: Dag[DagNode]) = {
+      //      val r = d.value.kind.scope == SingletonScope && !toInboundParameters.isConnected(d)
+      val r = !toInboundParameters.isConnected(d)
+      context.warning(pos, ">>" + d.value.id + " ----- " + r + "--" + d.value)
+      r
+    }
+
+    def initializer: Seq[DagToTree] => Seq[Tree] = (dependencies: Seq[DagToTree]) => {
+      //        dependencies.head.allDependencies.filter(d => isParamIndependentSingleton(d.dag)).flatMap(_.localInitialization)
+      //        DagToTree.distinct(dependencies.head.dependencies).filter(d => isParamIndependentSingleton(d.dag)).flatMap(_.localInitialization)
+
+      Nil
+    }
+
+    def invoker: Seq[DagToTree] => Tree = (dependencies: Seq[DagToTree]) => {
+      val v = dependencies.head
+      val inits = v.allDependencies.filterNot(d => isParamIndependentSingleton(d.dag)).flatMap(_.localInitialization)
+      q"""{ (..$pars) =>
+        ..${v.initialization}
+        ${v.value}
+      }"""
     }
 
   }

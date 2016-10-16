@@ -11,9 +11,9 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     val $exprNm = $valueExpr
     """
     parent.map { par =>
-      Node[N](DagNode.value(kind, vexpr :: Nil, q"$exprNm", tpe, valueExpr.pos), par :: Nil)
+      Node[N](DagNode.value(kind, vexpr :: Nil, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)), par :: Nil)
     }.getOrElse {
-      Leaf[N](DagNode.value(kind, vexpr :: Nil, q"$exprNm", tpe, valueExpr.pos))
+      Leaf[N](DagNode.value(kind, vexpr :: Nil, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)))
     }
   }
   

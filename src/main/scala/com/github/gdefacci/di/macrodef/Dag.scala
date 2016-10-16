@@ -46,12 +46,25 @@ private[di] object Dag {
     mp(keyf(d.value))
   }
   
-  def foldDistinct[T, ID, ACC](dag:Dag[T], keyf:T => ID, zero:ACC)(f:(ACC, Dag[T]) => ACC) :ACC= {
+  def foldDistinctPair[T, ID, ACC](dag:Dag[T], keyf:T => ID, zero:ACC, initial:Set[ID])(f:(ACC, Dag[T]) => ACC) :(Set[ID], ACC) = {
     fold(dag, Set.empty[ID] -> zero) { (acc0, i) => 
       val (visited, acc) = acc0
       val k= keyf(i.value)
       if (visited.contains(k)) acc0
       else (visited + k) -> f(acc, i)        
+    }
+  }
+
+  
+  def foldDistinct[T, ID, ACC](dag:Dag[T], keyf:T => ID, zero:ACC)(f:(ACC, Dag[T]) => ACC) :ACC= {
+    foldDistinctPair[T, ID, ACC](dag, keyf, zero, Set.empty)(f)._2
+  }
+  
+  def foldDistinctSeq[T, ID, ACC](dags:Seq[Dag[T]], keyf:T => ID, zero:ACC)(f:(ACC, Dag[T]) => ACC) :ACC= {
+    val z = Set.empty[ID]
+    dags.foldLeft(z -> zero) { (acc, dag) =>
+      val (ids, res) = acc
+      foldDistinctPair[T, ID, ACC](dag, keyf, res, ids)(f)
     }._2
   }
 
@@ -67,6 +80,23 @@ class DagConnections[T](pred: T => Boolean, current: MMap[Dag[T], Boolean] = MMa
           if (pred(dag.value)) true
           else dag.inputs.exists(inp => isConnected(inp))
         current += (dag -> r)
+        r
+    }
+  }
+  
+}
+
+class NDagConnections[T, ID](pred: T => Boolean, keyf:T => ID, current: MMap[ID, Boolean] = MMap.empty[ID, Boolean]) {
+  
+  def isConnected(dag: Dag[T]): Boolean = {
+    val key = keyf(dag.value)
+    current.get(key) match {
+      case Some(v) => v
+      case None =>
+        val r =
+          if (pred(dag.value)) true
+          else dag.inputs.exists(inp => isConnected(inp))
+        current += (key -> r)
         r
     }
   }

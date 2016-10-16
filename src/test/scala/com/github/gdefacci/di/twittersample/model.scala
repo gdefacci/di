@@ -55,14 +55,14 @@ object TwitterModule {
   @Singleton def createTweeterApi(user: User, httpClient: OkHttpClient) = TwitterApi(user, httpClient)
 }
 
-case class TweeterService1(f:User => Tweeter)
+case class TweeterService1(f:User => Tweeter, client:OkHttpClient)
 
 object TwitterModule1 {
   
   @Singleton val bindHttpClient = Bind.bind[OkHttpClient]
   @Singleton def createTweeterApi(user: User, httpClient: OkHttpClient) = TwitterApi(user, httpClient)
   
-  val fbind = Bind.bind[User => Tweeter]
+  @Singleton val fbind = Bind.bind[User => Tweeter]
   
 }
 
