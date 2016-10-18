@@ -6,6 +6,8 @@ trait DagToExpressionFactoryMixin[C <: Context] { self: DagNodes[C] =>
   val context: C
 
   import context.universe._
+  
+  import DagToExpression.singletonize
 
   object DagToExpressionFactory {
     
@@ -34,7 +36,7 @@ trait DagToExpressionFactoryMixin[C <: Context] { self: DagNodes[C] =>
         val pars = paramsDags.map(_._1)
         val funTree = q"(..$pars) => { ${genExpressionToTree(impl)} }"
         
-        createExpression(dag, decls, funTree)
+        singletonize(createExpression(dag, decls, funTree))
       }
     }
     
@@ -67,10 +69,7 @@ trait DagToExpressionFactoryMixin[C <: Context] { self: DagNodes[C] =>
             val body = genExpressionToTree(impl)
             val mthdTree = q"def ${mthd.name}(...${args}):${mthd.returnType} = { $body }"
 
-            decls match {
-              case Seq() => new Gen.Value(dag, mthdTree)
-              case decls => new Gen.Block(dag, decls, mthdTree)
-            }
+            createExpression(dag, decls, mthdTree)
         }
 
         val allDecls = Gen.allDeclarations(constrDeps.map(_.value) ++ members, _.source.value.id)
@@ -82,7 +81,7 @@ trait DagToExpressionFactoryMixin[C <: Context] { self: DagNodes[C] =>
             reflectUtils.newAbstractClass(constructor.owner, constructor.paramLists, constrDeps.map(_.value.value), members.map(_.value))
         }
         
-        createExpression(dag, allDecls, resTree)
+        singletonize(createExpression(dag, allDecls, resTree))
       }
     }
   }

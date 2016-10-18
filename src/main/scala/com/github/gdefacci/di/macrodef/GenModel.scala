@@ -14,7 +14,6 @@ class GenModel[S, N, V] {
     override def toString = s"Block($source, ${declarations.mkString(",")}, $value)"
   }
 
-
   final class Declaration(val name: N, val expression: Expression) {
     override def toString = s"Declaration($name = $expression)"
   }
@@ -24,7 +23,7 @@ class GenModel[S, N, V] {
 
   def fromDag[T, ID](keyf: T => ID, f: (Dag[T], Seq[Dag[Expression]]) => Expression)(dag: Dag[T]): Dag[Expression] = {
     Dag.mapValues[T, ID, Dag[Expression]](dag, keyf) { (d, inpDags) =>
-      Node(f(d, inpDags), inpDags)
+      Dag(f(d, inpDags), inpDags)
     }
   }
 

@@ -34,7 +34,7 @@ private[di] trait DagNodes[C <: Context] {
   }
 
   val Gen = new GenModel[Dag[DagNode], TermName, Tree]
-  
+
   def genExpressionToTree(expr: Gen.Expression): Tree = {
     expr match {
       case v: Gen.Value => v.value
@@ -62,35 +62,31 @@ private[di] trait DagNodes[C <: Context] {
       val decl = new Gen.Declaration(termName, v)
       new Gen.Block(dag, decls :+ decl, q"$termName")
     }
-
-    def apply(valuef: Seq[Tree] => Tree): DagToExpression = { (dag, deps) =>
-      val decls = Gen.allDeclarations(deps.map(_.value), _.source.value.id)
-      new Gen.Block(dag, decls, valuef(deps.map(_.value.value)))
-    }
-
+    
     def const(tree: Tree): DagToExpression = { (dag, deps) =>
       new Gen.Value(dag, tree)
     }
 
-    def singletonize(de: DagToExpression): DagToExpression = { (dag, deps) =>
-      val r = de(dag, deps)
-      if (r.source.value.kind.scope == SingletonScope) singletonizeExpression(r)
-      else r
+    def apply(valuef: Seq[Tree] => Tree): DagToExpression = { (dag, deps) =>
+      val decls = Gen.allDeclarations(deps.map(_.value), _.source.value.id)
+      singletonize(new Gen.Block(dag, decls, valuef(deps.map(_.value.value))))
     }
 
-    private def singletonizeExpression(e: Gen.Expression): Gen.Expression = {
-      val singletonName = TermName(context.freshName("singleton" + e.source.value.name))
-      e match {
-        case v: Gen.Value =>
-          new Gen.Block(v.source, new Gen.Declaration(singletonName, v) :: Nil, q"$singletonName")
-        case v: Gen.Block =>
-          val v1 = v.source.value
-          val newSource =
-            DagNode(v1.providerSource, v1.kind, v1.description, v1.name, v1.typ, v1.sourcePos, DagToExpression.const(q""))
+    def singletonize(e: Gen.Expression): Gen.Expression = {
+      if (e.source.value.kind.scope != SingletonScope) e
+      else {
+        val singletonName = TermName(context.freshName("singleton" + e.source.value.name))
+        e match {
+          case v: Gen.Value =>
+            new Gen.Block(v.source, new Gen.Declaration(singletonName, v) :: Nil, q"$singletonName")
+          case v: Gen.Block =>
+            val v1 = v.source.value
+            val newSource =
+              DagNode(v1.providerSource, v1.kind, v1.description, v1.name, v1.typ, v1.sourcePos, DagToExpression.const(q""))
 
-          new Gen.Block(v.source, v.declarations :+ new Gen.Declaration(singletonName, new Gen.Value(Node(newSource, e.source.inputs), v.value)), q"$singletonName")
+            new Gen.Block(v.source, v.declarations :+ new Gen.Declaration(singletonName, new Gen.Value(Dag(newSource, e.source.inputs), v.value)), q"$singletonName")
+        }
       }
-
     }
 
   }
@@ -227,7 +223,7 @@ private[di] trait DagNodes[C <: Context] {
               context.abort(par.pos, "parameters cant have scope annotations")
             }
             val parTyp = par.info.substituteTypes(tpKeys, tpVals)
-            Leaf[DagNodeOrRef](Ref(Kind(parKnd.ids.head, parKnd.scope), parTyp, par.pos))
+            Dag[DagNodeOrRef](Ref(Kind(parKnd.ids.head, parKnd.scope), parTyp, par.pos))
           })
 
           val mRetType = polyType.resultType.substituteTypes(tpKeys, tpVals)
@@ -242,7 +238,7 @@ private[di] trait DagNodes[C <: Context] {
               method.pos,
               DagToExpression(invoker))
 
-          Node[DagNodeOrRef](nd, dagInputs)
+          Dag[DagNodeOrRef](nd, dagInputs)
         }
       }
     }

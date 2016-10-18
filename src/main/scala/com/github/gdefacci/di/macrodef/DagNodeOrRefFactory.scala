@@ -11,9 +11,9 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     val $exprNm = $valueExpr
     """
     parent.map { par =>
-      Node[N](DagNode.value(kind, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)), par :: Nil)
+      Dag[N](DagNode.value(kind, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)), par :: Nil)
     }.getOrElse {
-      Leaf[N](DagNode.value(kind, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)))
+      Dag[N](DagNode.value(kind, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)))
     }
   }
   
@@ -34,7 +34,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
       if (knd.ids.size > 1) {
         context.abort(par.pos, "parameters must have at most one identifier annotation")
       }
-      Leaf[DagNodeOrRef](outboundParameterRef(Kind(knd.ids.head, knd.scope), par))
+      Dag[DagNodeOrRef](outboundParameterRef(Kind(knd.ids.head, knd.scope), par))
     })
     
   def methodDag(container: Dag[DagNodeOrRef],
@@ -44,7 +44,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     val parametersDags: Seq[Dag[DagNodeOrRef]] = paramListsDags(paramLists)
     assert(paramLists.map(_.length).sum == parametersDags.length)
     val knds = kindProvider(method)
-    knds.ids.map( id => Node[DagNodeOrRef](DagNode.methodCall(Kind(id, knds.scope), Some(containerTermName), method), parametersDags.toSeq :+ container))
+    knds.ids.map( id => Dag[DagNodeOrRef](DagNode.methodCall(Kind(id, knds.scope), Some(containerTermName), method), parametersDags.toSeq :+ container))
   }
   
   def constructorDag(knd:Kind,
@@ -57,7 +57,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     }
     val parametersDags: Seq[Dag[DagNodeOrRef]] = paramListsDags(constructorMethod.paramLists)
     assert(parametersDags.length == constructorMethod.paramLists.map(_.length).sum)
-    Node[DagNodeOrRef](DagNode.constructorCall(knd, exprType, constructorMethod, members), parametersDags)
+    Dag[DagNodeOrRef](DagNode.constructorCall(knd, exprType, constructorMethod, members), parametersDags)
   }
 
   

@@ -13,8 +13,9 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
   class TypeResolver(
       mappings: Providers[DagNodeOrRef],
       dagProviders: MapOfBuffers[Id, Dag[DagNode]],
-      private val currentSingletons: MapOfBuffers[Id, Dag[DagNode]] = MapOfBuffers.empty,
       stack: collection.mutable.Queue[DagNodeOrRef] = collection.mutable.Queue.empty[DagNodeOrRef]) {
+
+    private val currentSingletons: MapOfBuffers[Id, Dag[DagNode]] = MapOfBuffers.empty
 
     private def error(msg: String) = {
       val stackLog: String = stack.reverse.map(hd => s"resolving ${hd.typ}").mkString("\n")
@@ -129,9 +130,9 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
 
     private def resolveDagNode(nd: DagNode, inputs: Seq[Dag[DagNodeOrRef]]): Dag[DagNode] = inputs match {
       case Seq() =>
-        Leaf(nd)
+        Dag(nd)
       case inputs =>
-        Node[DagNode](nd, inputs.map(dg => resolveDagNodeOrRef(dg.value, dg.inputs)))
+        Dag[DagNode](nd, inputs.map(dg => resolveDagNodeOrRef(dg.value, dg.inputs)))
     }
 
     private def implementsFunction(kind: Kind, funTyp: Type, pos: Position): Dag[DagNode] = {
@@ -140,7 +141,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       val parnames = 1.to(inpTypes.length).map(i => TermName(s"par$i"))
       val pars = inpTypes.zip(parnames).map { case (inp, parName) => q"$parName:$inp" }
       val parametersDags: Seq[Dag[DagNode]] = {
-        inpTypes.zip(parnames).map { case (inp, par) => Leaf(DagNode.value(Kind.default, q"$par", inp, pos, DagToExpression.const(q"$par"))) }
+        inpTypes.zip(parnames).map { case (inp, par) => Dag(DagNode.value(Kind.default, q"$par", inp, pos, DagToExpression.const(q"$par"))) }
       }
       val res = {
         val resultType = funTyp.typeArgs.last
@@ -149,7 +150,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       val ftsym = funTyp.typeSymbol
       val name: String = ftsym.name.toString
       val description = ftsym.fullName
-      Node(DagNode(ProviderSource.ValueSource, kind, name, description, funTyp, ftsym.pos, DagToExpressionFactory.function(funTyp, pars.zip(parametersDags))), 
+      Dag(DagNode(ProviderSource.ValueSource, kind, name, description, funTyp, ftsym.pos, DagToExpressionFactory.function(funTyp, pars.zip(parametersDags))), 
           res :: Nil)
     }
 
@@ -168,12 +169,12 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       val description = tsym.fullName
       val pos = tsym.pos
 
-      Node(DagNode(ProviderSource.ValueSource, kind, name, description, typ, pos, DagToExpressionFactory.abstractType(typ, constrPars, pars)),
+      Dag(DagNode(ProviderSource.ValueSource, kind, name, description, typ, pos, DagToExpressionFactory.abstractType(typ, constrPars, pars)),
         constrPars.map(_.parametersDags.map(_._2)).getOrElse(Nil) ++ pars.map(_.impl))
     }
 
     private def inboundParameterDag(par: Symbol, knd: Kind): Dag[DagNode] =
-      Leaf[DagNode](DagNode.value(knd, q"${par.asTerm.name}", par.info, par.pos, DagToExpression.const(q"${par.asTerm.name}")))
+      Dag[DagNode](DagNode.value(knd, q"${par.asTerm.name}", par.info, par.pos, DagToExpression.const(q"${par.asTerm.name}")))
 
     private def implementMethod(m: MethodSymbol): (List[(Symbol, Set[Dag[DagNode]])], Dag[DagNode]) = {
       val pars0 = m.paramLists.flatMap { pars =>
@@ -195,7 +196,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       nmappings ++= parametersBindings
       val dagProviders = this.dagProviders.copy
 
-      val tr = new TypeResolver(nmappings, dagProviders,  MapOfBuffers.empty, stack.clone())
+      val tr = new TypeResolver(nmappings, dagProviders,  stack.clone())
       val res = tr.resolveDagNodeOrRef(Ref(Kind(Global, DefaultScope), typ, typ.typeSymbol.pos), Nil)
       this.dagProviders ++= tr.currentSingletons
       res

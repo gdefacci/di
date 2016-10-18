@@ -46,8 +46,8 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
       case (acc, membersSelect.MethodBinding(member)) =>
       
         val dgs = methodDag(exprDag, exprNm, member).toSeq.flatMap {
-          case dg @ Leaf(dn: DagNode) => (dn.kind.id -> dg) :: Nil
-          case dg @ Node(dn: DagNode, _) => (dn.kind.id -> dg) :: Nil
+//          case dg @ Leaf(dn: DagNode) => (dn.kind.id -> dg) :: Nil
+          case dg @ Dag(dn: DagNode, _) => (dn.kind.id -> dg) :: Nil
           case _ => Nil
         }
         acc.addMembers(dgs)
@@ -55,7 +55,7 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
       case (acc, membersSelect.BindInstance(member, abstractType, concreteType)) =>
         
         val knds = kindProvider(member)
-        acc.addMembers(knds.ids.toSeq.map(id => id -> Leaf[DagNodeOrRef](Ref(Kind(id, knds.scope), concreteType.asType.toType, member.pos))))
+        acc.addMembers(knds.ids.toSeq.map(id => id -> Dag[DagNodeOrRef](Ref(Kind(id, knds.scope), concreteType.asType.toType, member.pos))))
       
       case (acc, membersSelect.ModuleContainerBinding(member, typ)) =>
         
