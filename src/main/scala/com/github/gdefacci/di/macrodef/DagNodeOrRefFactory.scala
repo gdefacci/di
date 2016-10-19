@@ -17,7 +17,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     }
   }
   
-  def outboundParameterRef(knd:Kind, par:Symbol):Ref = {
+  def outboundParameterDag(knd:Kind, par:Symbol):Ref = {
     val parTyp = par.info match {
       case TypeRef(pre, k, args) if k == definitions.ByNameParamClass => 
         assert(args.length==1)
@@ -34,7 +34,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
       if (knd.ids.size > 1) {
         context.abort(par.pos, "parameters must have at most one identifier annotation")
       }
-      Dag[DagNodeOrRef](outboundParameterRef(Kind(knd.ids.head, knd.scope), par))
+      Dag[DagNodeOrRef](outboundParameterDag(Kind(knd.ids.head, knd.scope), par))
     })
     
   def methodDag(container: Dag[DagNodeOrRef],

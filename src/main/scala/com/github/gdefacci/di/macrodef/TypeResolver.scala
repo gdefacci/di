@@ -82,25 +82,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
           val polyMembers = mappings.findPolymorphicMembers(id, df => df.apply(typ))
           polyMembers match {
             case Seq() =>
-              checkIsNotPrimitive(id, typ)
-              if (definitions.FunctionClass.seq.contains(typ.typeSymbol)) {
-                implementsFunction(ref.kind, typ, ref.sourcePos)
-              } else if (typ.typeSymbol.isAbstract) {
-                implementsAbstractType(ref.kind, typ)
-              } else {
-                val constructorMethod = membersSelect.getPrimaryConstructor(typ).getOrElse {
-                  error(s"cant find primary constructor for ${typ.typeSymbol.fullName} resolving $typ ${describeId(id)}")
-                }
-                membersSelect.getPolyType(constructorMethod.returnType.etaExpand).map { polyType =>
-                  val dg = new PolyDagNodeFactory(ref.kind, None, constructorMethod, polyType).apply(ref.typ).getOrElse {
-                    error(s"error creating dag for polymorpic primary constructor for ${typ.typeSymbol.fullName} resolving $typ ${describeId(id)}")
-                  }
-                  resolveDagNodeOrRef(dg.value, dg.inputs)
-                }.getOrElse {
-                  val dnd = constructorDag(ref.kind, typ, constructorMethod, Nil)
-                  resolveDagNodeOrRef(dnd.value, dnd.inputs)
-                }
-              }
+              instantiateRef(ref)
 
             case Seq(dag) =>
               resolveDagNodeOrRef(dag.value, dag.inputs)
@@ -117,11 +99,10 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     private def resolveMultiTargetRef(ref: Ref, itemType: Type) = {
       val Ref(Kind(id, _), typ, pos) = ref
       val insts: Seq[Dag[DagNodeOrRef]] = mappings.findMembers(id, (nd) => nd != ref && nd.typ <:< itemType)
-
+      val desc = s"allBindings$itemType"
       val nd = DagNode(new ProviderSource.AllbindingsSource(itemType.typeSymbol.asType),
         Kind.default,
-        s"allBindings$itemType",
-        s"allBindings$itemType",
+        desc, desc,
         typ, pos,
         DagToExpression(inps => q"new com.github.gdefacci.di.runtime.AllBindings[$itemType]( List[$itemType](..$inps) )"))
 
@@ -133,6 +114,31 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
         Dag(nd)
       case inputs =>
         Dag[DagNode](nd, inputs.map(dg => resolveDagNodeOrRef(dg.value, dg.inputs)))
+    }
+    
+  
+    private def instantiateRef(ref: Ref) = {
+      val Ref(Kind(id, _), typ, pos) = ref
+
+      checkIsNotPrimitive(id, typ)
+      if (reflectUtils.isFunctionType(typ.typeSymbol)) {
+        implementsFunction(ref.kind, typ, ref.sourcePos)
+      } else if (typ.typeSymbol.isAbstract) {
+        implementsAbstractType(ref.kind, typ)
+      } else {
+        val constructorMethod = membersSelect.getPrimaryConstructor(typ).getOrElse {
+          error(s"cant find primary constructor for ${typ.typeSymbol.fullName} resolving $typ ${describeId(id)}")
+        }
+        membersSelect.getPolyType(constructorMethod.returnType.etaExpand).map { polyType =>
+          val dg = new PolyDagNodeFactory(ref.kind, None, constructorMethod, polyType).apply(ref.typ).getOrElse {
+            error(s"error creating dag for polymorpic primary constructor for ${typ.typeSymbol.fullName} resolving $typ ${describeId(id)}")
+          }
+          resolveDagNodeOrRef(dg.value, dg.inputs)
+        }.getOrElse {
+          val dnd = constructorDag(ref.kind, typ, constructorMethod, Nil)
+          resolveDagNodeOrRef(dnd.value, dnd.inputs)
+        }
+      }
     }
 
     private def implementsFunction(kind: Kind, funTyp: Type, pos: Position): Dag[DagNode] = {
@@ -150,15 +156,15 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       val ftsym = funTyp.typeSymbol
       val name: String = ftsym.name.toString
       val description = ftsym.fullName
-      Dag(DagNode(ProviderSource.ValueSource, kind, name, description, funTyp, ftsym.pos, DagToExpressionFactory.function(funTyp, pars.zip(parametersDags))), 
-          res :: Nil)
+      Dag(DagNode(ProviderSource.ValueSource, kind, name, description, funTyp, ftsym.pos, DagToExpressionFactory.function(funTyp, pars.zip(parametersDags))),
+        res :: Nil)
     }
 
     private def implementsAbstractType(kind: Kind, typ: Type): Dag[DagNode] = {
 
       val primaryConstructor = membersSelect.getPrimaryConstructor(typ)
       val constrPars = primaryConstructor.map(c => c -> c.paramLists.flatten).map {
-        case (constr, pars) => new ConstructorCall(constr, pars.map(par => par -> resolveDagNodeOrRef(outboundParameterRef(Kind.default, par), Nil)))
+        case (constr, pars) => new ConstructorCall(constr, pars.map(par => par -> resolveDagNodeOrRef(outboundParameterDag(Kind.default, par), Nil)))
       }
       val pars = membersSelect.abstractMembers(typ).map { mthd =>
         val (pdgs, impl) = implementMethod(mthd)
@@ -196,7 +202,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       nmappings ++= parametersBindings
       val dagProviders = this.dagProviders.copy
 
-      val tr = new TypeResolver(nmappings, dagProviders,  stack.clone())
+      val tr = new TypeResolver(nmappings, dagProviders, stack.clone())
       val res = tr.resolveDagNodeOrRef(Ref(Kind(Global, DefaultScope), typ, typ.typeSymbol.pos), Nil)
       this.dagProviders ++= tr.currentSingletons
       res

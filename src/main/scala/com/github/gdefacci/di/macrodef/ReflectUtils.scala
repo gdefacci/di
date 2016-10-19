@@ -17,7 +17,7 @@ private[di] class ReflectUtils[C <: Context](val context: C) {
       }
     }
   }
-  
+
   def methodCall(container: Option[TermName], method: MethodSymbol, typeArgs: Seq[Type], args: Seq[Tree]) = {
     val pars = Utils.byLengthsPartition(method.paramLists.map(_.length), args.toList)
     if (method.isConstructor) {
@@ -45,5 +45,8 @@ private[di] class ReflectUtils[C <: Context](val context: C) {
     q"""new ${typ} {
       ..$members
     }"""
+
+  def isFunctionType(t: Symbol) =
+    definitions.FunctionClass.seq.contains(t)
 
 }

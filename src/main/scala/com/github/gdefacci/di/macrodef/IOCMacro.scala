@@ -7,7 +7,7 @@ object IOCMacro {
   def get[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Tree = {
     val td = new TypeDag[c.type](c)
 
-    val mappings = MProvidersMap.empty[Id, td.DagNodeOrRef, td.DagNodeDagFactory]
+    val mappings = ProvidersMap.empty[Id, td.DagNodeOrRef, td.DagNodeDagFactory]
     modules.foreach { module =>
       mappings ++= td.moduleDagNodeOrRefProviders(module)
     }
@@ -18,7 +18,7 @@ object IOCMacro {
   def graph[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Expr[T] = {
     val dg = new DagGraph[c.type](c)
 
-    val mappings = MProvidersMap.empty[Id, dg.td.DagNodeOrRef, dg.td.DagNodeDagFactory]
+    val mappings = ProvidersMap.empty[Id, dg.td.DagNodeOrRef, dg.td.DagNodeDagFactory]
     modules.foreach { module =>
       mappings ++= dg.td.moduleDagNodeOrRefProviders(module)
     }

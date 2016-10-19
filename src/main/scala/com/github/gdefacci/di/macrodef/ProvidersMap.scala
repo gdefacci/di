@@ -1,10 +1,10 @@
 package com.github.gdefacci.di.macrodef
 
-private[di] object MProvidersMap {
+private[di] object ProvidersMap {
 
-  def empty[KI, T, TF] = new MProvidersMap[KI, T, TF](MapOfBuffers.empty, MapOfBuffers.empty)
+  def empty[KI, T, TF] = new ProvidersMap[KI, T, TF](MapOfBuffers.empty, MapOfBuffers.empty)
 
-  def apply[KI, T, TF](mp: Seq[(KI, Dag[T])], polyMembersMap: Seq[(KI, TF)]): MProvidersMap[KI, T, TF] = {
+  def apply[KI, T, TF](mp: Seq[(KI, Dag[T])], polyMembersMap: Seq[(KI, TF)]): ProvidersMap[KI, T, TF] = {
     val res = empty[KI, T, TF]
 
     mp.groupBy(_._1).map { case (k, vs) => k -> vs.map(_._2) }.foreach {
@@ -17,7 +17,7 @@ private[di] object MProvidersMap {
   }
 
 }
-private[di] class MProvidersMap[KI, T, TF] private ( 
+private[di] class ProvidersMap[KI, T, TF] private ( 
     private val membersMap:MapOfBuffers[KI, Dag[T]],
     private val polyMembersMap:MapOfBuffers[KI, TF]) {
   
@@ -35,7 +35,7 @@ private[di] class MProvidersMap[KI, T, TF] private (
     def ++=(mp: Seq[(KI, TF)]): Unit = polyMembersMap ++= mp
   }
   
-  def ++=(e: MProvidersMap[KI, T, TF]): Unit = {
+  def ++=(e: ProvidersMap[KI, T, TF]): Unit = {
     membersMap ++= e.membersMap
     polyMembersMap ++= e.polyMembersMap
   }
@@ -43,6 +43,6 @@ private[di] class MProvidersMap[KI, T, TF] private (
   def members: Seq[Dag[T]] = membersMap.values
   def polyMembers: Seq[TF] = polyMembersMap.values
     
-  def copy() = new MProvidersMap(membersMap.copy(), polyMembersMap.copy())
+  def copy() = new ProvidersMap(membersMap.copy(), polyMembersMap.copy())
 }
 

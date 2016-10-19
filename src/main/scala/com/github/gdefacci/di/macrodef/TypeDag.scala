@@ -2,7 +2,6 @@ package com.github.gdefacci.di.macrodef
 
 import language.experimental.macros
 import scala.reflect.macros.blackbox.Context
-import com.github.gdefacci.di.runtime.ModulesContainer
 import scala.util.control.NonFatal
 
 private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with TypeResolverMixin[C] with DagToExpressionFactoryMixin[C] with DagNodeOrRefFactory[C] with DagToExpr[C] {
@@ -46,7 +45,6 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
       case (acc, membersSelect.MethodBinding(member)) =>
       
         val dgs = methodDag(exprDag, exprNm, member).toSeq.flatMap {
-//          case dg @ Leaf(dn: DagNode) => (dn.kind.id -> dg) :: Nil
           case dg @ Dag(dn: DagNode, _) => (dn.kind.id -> dg) :: Nil
           case _ => Nil
         }
@@ -78,11 +76,11 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
     val allMappings = membersMapping.addMember(exprDag.value.kind.id, exprDag)
 
-    MProvidersMap(allMappings.members, allMappings.polyMembers)
+    ProvidersMap(allMappings.members, allMappings.polyMembers)
   }
   
   private def moduleContainerDagNodeOrRefProviders(moduleContainerAlias:ExprAlias): Providers[DagNodeOrRef] = {
-    val mappings = MProvidersMap.empty[Id, DagNodeOrRef, DagNodeDagFactory]
+    val mappings = ProvidersMap.empty[Id, DagNodeOrRef, DagNodeDagFactory]
     membersSelect.getValues(moduleContainerAlias.typ).map { member =>
       val typ = if (member.isModule) member.asModule.moduleClass.asType.toType 
         else if (member.isMethod) member.asMethod.returnType
