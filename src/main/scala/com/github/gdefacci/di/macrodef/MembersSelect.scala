@@ -1,8 +1,7 @@
 package com.github.gdefacci.di.macrodef
 
+import com.github.gdefacci.di.runtime.{AllBindings, ModulesContainer}
 import scala.reflect.macros.blackbox.Context
-import com.github.gdefacci.di.runtime.AllBindings
-import com.github.gdefacci.di.runtime.ModulesContainer
 
 private[di] object MembersSelect {
   val baseSkipMethods = Set("$init$", "synchronized", "##", "!=", "==", "ne", "eq", "asInstanceOf", "isInstanceOf")
@@ -20,7 +19,7 @@ private[di] class MembersSelect[C <: Context](val context: C) {
     member.isPublic && member.isMethod && !member.isConstructor && !isReserved(member)
 
   private def isReserved = (member:Symbol) => 
-    (member.isSynthetic || member.isImplementationArtifact || member.isJava)
+    member.isSynthetic || member.isImplementationArtifact || member.isJava
 
   private def isBindingMethod = (member: Symbol) =>
     isPublicMethod(member) && !isBindInstance(member) 
@@ -46,7 +45,7 @@ private[di] class MembersSelect[C <: Context](val context: C) {
   
   private val modulesContainerType = typeOf[ModulesContainer]
   
-  def isModuleContainerInstance(t:Type) = (t <:< modulesContainerType) 
+  def isModuleContainerInstance(t:Type) = t <:< modulesContainerType
 
   def getBindings[T](t: context.universe.Type):Seq[Binding]  = {
     

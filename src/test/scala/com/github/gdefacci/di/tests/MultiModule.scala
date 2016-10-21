@@ -1,9 +1,8 @@
 package com.github.gdefacci.di.tests
 
-import com.github.gdefacci.di.runtime.AllBindings
 import javax.inject.Named
-import com.github.gdefacci.di.runtime.Bind
-import com.github.gdefacci.di.runtime.ModulesContainer
+
+import com.github.gdefacci.di.runtime.{AllBindings, Bind, ModulesContainer}
 
 object MultiModule {
 

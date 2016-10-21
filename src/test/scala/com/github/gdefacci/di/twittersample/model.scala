@@ -14,13 +14,13 @@ case class User(name: String)
 case class TwitterApi(user: User, httpClient: OkHttpClient) {
 
   def sendTweet(tweet: String) = {
-    val request = "[" + user + "] send tweet request : " + tweet;
-    httpClient.sendRequest(request);
+    val request = "[" + user + "] send tweet request : " + tweet
+    httpClient.sendRequest(request)
   }
 
   def getTimeline(tweetsLimit: Int): List[String] = {
-    httpClient.sendRequest("[" + user + "] send get timeline request " + tweetsLimit);
-    List("@rbrugier: #Dagger2 is great ! ");
+    httpClient.sendRequest("[" + user + "] send get timeline request " + tweetsLimit)
+    List("@rbrugier: #Dagger2 is great ! ")
   }
 
 }
@@ -30,7 +30,7 @@ case class Tweeter(api: TwitterApi) {
 }
 
 case class Timeline(api:TwitterApi) {
-  def getTimeline(tweetsLimit:Int):List[String] = api.getTimeline(tweetsLimit);
+  def getTimeline(tweetsLimit:Int):List[String] = api.getTimeline(tweetsLimit)
 }
 
 trait ApplicationComponent {

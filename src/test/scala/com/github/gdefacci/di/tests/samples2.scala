@@ -1,12 +1,8 @@
 package com.github.gdefacci.di.tests
 
-import javax.inject.Named
+import javax.inject.{Named, Singleton}
 
-import com.github.gdefacci.di.runtime.{Bind}
-import scala.annotation.StaticAnnotation
-import javax.inject.Qualifier
-import scala.annotation.ClassfileAnnotation
-import javax.inject.Singleton
+import com.github.gdefacci.di.runtime.Bind
 
 object samples2 {
 

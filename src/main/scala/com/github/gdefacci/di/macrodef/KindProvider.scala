@@ -33,7 +33,6 @@ private[di] case object SingletonScope extends DagScope
 private[di] trait KindProvider[C <: Context] {
   val context: C
 
-  import context.universe._
 
   def apply(sym: context.Symbol): Kinds
 
@@ -108,11 +107,11 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
       val z: (Set[Id], Option[DagScope], Option[Boolean]) = (Set.empty, None, None)
       val (ids, optScope, isItem) = annotations.foldLeft(z) { (acc, annotation) =>
         val (ids, scope, isItem) = acc
-        val nscope = (scope -> annotationScope(annotation)) match {
+        val nscope = scope -> annotationScope(annotation) match {
           case (Some(_), Some(_)) => context.abort(context.enclosingPosition, "more than one scope annotation ")
           case (x, y) => y.orElse(x)
         }
-        ((ids ++ annotationId(annotation).toSet), nscope, isItem)
+        (ids ++ annotationId(annotation).toSet, nscope, isItem)
       }
 
       Kinds(if (ids.nonEmpty) ids else Set(Global), optScope.getOrElse(DefaultScope))

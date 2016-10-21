@@ -1,7 +1,7 @@
 package com.github.gdefacci.di.tests
 
-import com.github.gdefacci.di.runtime.Bind
 import javax.inject.Singleton
+import com.github.gdefacci.di.runtime.Bind
 
 object samples3 {
 

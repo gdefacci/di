@@ -28,7 +28,7 @@ private[di] class ProvidersMap[KI, T, TF] private (
     polyMembersMap.values(kid).map(select).collect { case Some(v) => v }
   
   def +=(e: (KI, Dag[T])): Unit = membersMap += (e._1, e._2)
-  def ++=(mp: Seq[(KI, Dag[T])]): Unit = membersMap ++= (mp)
+  def ++=(mp: Seq[(KI, Dag[T])]): Unit = membersMap ++= mp
     
   object poly {
     def +=(e: (KI, TF)): Unit = polyMembersMap += (e._1, e._2)

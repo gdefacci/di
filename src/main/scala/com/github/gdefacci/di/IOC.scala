@@ -1,8 +1,8 @@
 package com.github.gdefacci.di
 
-import language.experimental.macros
 import com.github.gdefacci.di.graph.Dependency
 
+import scala.language.experimental.macros
 object IOC {
 
   def get[T](modules: Any*): T = macro macrodef.IOCMacro.get[T]

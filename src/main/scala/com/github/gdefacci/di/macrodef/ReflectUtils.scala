@@ -42,7 +42,7 @@ private[di] class ReflectUtils[C <: Context](val context: C) {
   }
 
   def newTrait(typ: Symbol, members: Seq[Tree]): Tree =
-    q"""new ${typ} {
+    q"""new $typ {
       ..$members
     }"""
 

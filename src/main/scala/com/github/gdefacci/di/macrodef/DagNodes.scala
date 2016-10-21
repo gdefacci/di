@@ -1,8 +1,6 @@
 package com.github.gdefacci.di.macrodef
 
 import scala.reflect.macros.blackbox.Context
-import java.util.concurrent.atomic.AtomicInteger
-import com.sun.javafx.fxml.expression.Expression
 
 private[di] trait DagNodes[C <: Context] {
   val context: C
@@ -174,8 +172,8 @@ private[di] trait DagNodes[C <: Context] {
   class PolyDagNodeFactory(val kind: Kind, containerTermName: Option[TermName], method: MethodSymbol, polyType: PolyType) extends DagNodeDagFactory {
 
     val (typeArgs, underlying) = method.returnType match {
-      case TypeRef(NoPrefix, underlying, args) => (args -> underlying)
-      case TypeRef(prefix, underlying, args) => (args -> underlying)
+      case TypeRef(NoPrefix, underlying, args) => args -> underlying
+      case TypeRef(prefix, underlying, args) => args -> underlying
       case _ => context.abort(context.enclosingPosition, s"not a poly type method $method, return type ${method.returnType.getClass}")
     }
 

@@ -32,7 +32,7 @@ object IOCMacro {
     val tree = get[T](c)(modules: _*)
     val resText = s"""${show(tree)}"""
 
-    c.Expr[String](q"${resText}")
+    c.Expr[String](q"$resText")
   }
 
 }

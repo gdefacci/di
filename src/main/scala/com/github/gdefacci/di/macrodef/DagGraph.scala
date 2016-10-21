@@ -50,7 +50,7 @@ class DagGraph[C <: Context](val context: C) {
       case Seq() =>
         q"com.github.gdefacci.di.graph.TypeValue($owner, ${typ.typeSymbol.name.toTermName.toString})"
       case args =>
-        val typeArgs = args.map(toGraphType(_))
+        val typeArgs = args.map(toGraphType)
         q"com.github.gdefacci.di.graph.PolymorphicType($owner, ${typ.erasure.typeSymbol.name.toTermName.toString}, List(..$typeArgs))"
     }
   }

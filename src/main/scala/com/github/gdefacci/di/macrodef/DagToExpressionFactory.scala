@@ -67,7 +67,7 @@ trait DagToExpressionFactoryMixin[C <: Context] { self: DagNodes[C] =>
             }
             val (impl, decls) = Gen.partitionContent(expr => !isParamIndependentSingleton(expr.source))(bodyExpr.value)
             val body = genExpressionToTree(impl)
-            val mthdTree = q"def ${mthd.name}(...${args}):${mthd.returnType} = { $body }"
+            val mthdTree = q"def ${mthd.name}(...$args):${mthd.returnType} = { $body }"
 
             createExpression(dag, decls, mthdTree)
         }
