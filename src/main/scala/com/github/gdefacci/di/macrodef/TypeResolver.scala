@@ -13,13 +13,20 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
   class TypeResolver(
       mappings: Providers[DagNodeOrRef],
       dagProviders: MapOfBuffers[Id, Dag[DagNode]],
+      topLevelRefs:Set[Ref],
       stack: collection.mutable.Queue[DagNodeOrRef] = collection.mutable.Queue.empty[DagNodeOrRef]) {
 
     private val currentSingletons: MapOfBuffers[Id, Dag[DagNode]] = MapOfBuffers.empty
 
+//    context.warning(context.enclosingPosition, topLevelRefs.mkString(", "))
+    
     private def error(msg: String) = {
       val stackLog: String = stack.reverse.map(hd => s"resolving ${hd.typ}").mkString("\n")
       context.abort(context.enclosingPosition, msg + "\n" + stackLog)
+    }
+    
+    private def missingBindingError(id: Id, typ: Type) = {
+      error(s"could not find a binding for $typ ${describeId(id)}")
     }
 
     private def resolveRef(ref: Ref): Dag[DagNode] = {
@@ -65,12 +72,6 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
           val r = resolveDagNode(nd, inputs)
           stack.dequeue
           r
-      }
-    }
-
-    private def checkIsNotPrimitive(id: Id, typ: Type) = {
-      if (membersSelect.isPrimitive(typ)) {
-        error(s"could not find a binding for $typ ${describeId(id)}")
       }
     }
 
@@ -120,11 +121,19 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     private def instantiateRef(ref: Ref) = {
       val Ref(Kind(id, _), typ, pos) = ref
 
-      checkIsNotPrimitive(id, typ)
+      lazy val noBindingError = missingBindingError(id, typ)
+
+      if (membersSelect.isPrimitive(typ)) {
+        noBindingError
+      }
+      
+      lazy val isTopLevelref = topLevelRefs.contains(ref)
       if (reflectUtils.isFunctionType(typ.typeSymbol)) {
-        implementsFunction(ref.kind, typ, ref.sourcePos)
+        if (isTopLevelref) implementsFunction(ref.kind, typ, ref.sourcePos)
+        else noBindingError
       } else if (typ.typeSymbol.isAbstract) {
-        implementsAbstractType(ref.kind, typ)
+        if (isTopLevelref) implementsAbstractType(ref.kind, typ)
+        else noBindingError
       } else {
         val constructorMethod = membersSelect.getPrimaryConstructor(typ).getOrElse {
           error(s"cant find primary constructor for ${typ.typeSymbol.fullName} resolving $typ ${describeId(id)}")
@@ -202,7 +211,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       nmappings ++= parametersBindings
       val dagProviders = this.dagProviders.copy
 
-      val tr = new TypeResolver(nmappings, dagProviders, stack.clone())
+      val tr = new TypeResolver(nmappings, dagProviders, topLevelRefs, stack.clone())
       val res = tr.resolveDagNodeOrRef(Ref(Kind(Global, DefaultScope), typ, typ.typeSymbol.pos), Nil)
       this.dagProviders ++= tr.currentSingletons
       res

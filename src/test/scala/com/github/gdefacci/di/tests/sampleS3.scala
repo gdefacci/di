@@ -20,6 +20,8 @@ object samples3 {
 
   }
   
+  class HouseFactory(val create:String => House)
+  
   object ByName {
     def aString(a: => Int) = a.toString
   }

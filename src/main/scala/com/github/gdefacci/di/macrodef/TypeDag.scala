@@ -8,13 +8,17 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
   import context.universe._
 
-  private case class ModuleMappings(members: Seq[(Id, Dag[DagNodeOrRef])], polyMembers: Seq[(Id, DagNodeDagFactory)]) {
+  private case class ModuleMappings(members: Seq[(Id, Dag[DagNodeOrRef])], polyMembers: Seq[(Id, DagNodeDagFactory)], topLevelRefs:Set[Ref]) {
     def addMember(id: Id, d: Dag[DagNodeOrRef]) = copy(members = members :+ (id -> d))
     def addMembers(ms: Seq[(Id, Dag[DagNodeOrRef])]) = copy(members = members ++ ms)
     def addPolyMembers(ms: Seq[(Id, DagNodeDagFactory)]) = copy(polyMembers = polyMembers ++ ms)
     def addProviders(providers:Providers[DagNodeOrRef]) ={ 
       copy(members = members ++ providers.members.map( m => m.value.kind.id -> m ),
-          polyMembers = polyMembers ++ providers.polyMembers.map( m => m.kind.id -> m))
+          polyMembers = polyMembers ++ providers.polyMembers.map( m => m.kind.id -> m),
+          topLevelRefs = topLevelRefs ++ providers.topLevelRefs)
+    }
+    def addTopLevelRefs(refs:Seq[Ref]) = {
+      copy(topLevelRefs = topLevelRefs ++ refs)
     }
   }
   
@@ -41,7 +45,7 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     val exprNm = exprAlias.termName
     val exprDag = exprAlias.dag
     
-    val membersMapping = membersSelect.getBindings(exprAlias.typ).foldLeft(ModuleMappings(Nil, Nil)) {
+    val membersMapping = membersSelect.getBindings(exprAlias.typ).foldLeft(ModuleMappings(Nil, Nil, Set.empty)) {
       case (acc, membersSelect.MethodBinding(member)) =>
       
         val dgs = methodDag(exprDag, exprNm, member).toSeq.flatMap {
@@ -53,7 +57,12 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
       case (acc, membersSelect.BindInstance(member, abstractType, concreteType)) =>
         
         val knds = kindProvider(member)
-        acc.addMembers(knds.ids.toSeq.map(id => id -> Dag[DagNodeOrRef](Ref(Kind(id, knds.scope), concreteType.asType.toType, member.pos))))
+        val refs = knds.ids.toSeq.map(id => Ref(Kind(id, knds.scope), concreteType, member.pos))
+        
+        val acc1 = acc.addMembers(refs.map( r => (r.kind.id -> Dag(r) )))
+        if (abstractType == concreteType) {
+          acc1.addTopLevelRefs(refs)
+        } else acc1
       
       case (acc, membersSelect.ModuleContainerBinding(member, typ)) =>
         
@@ -76,11 +85,11 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
     val allMappings = membersMapping.addMember(exprDag.value.kind.id, exprDag)
 
-    ProvidersMap(allMappings.members, allMappings.polyMembers)
+    ProvidersMap(allMappings.members, allMappings.polyMembers, allMappings.topLevelRefs)
   }
   
   private def moduleContainerDagNodeOrRefProviders(moduleContainerAlias:ExprAlias): Providers[DagNodeOrRef] = {
-    val mappings = ProvidersMap.empty[Id, DagNodeOrRef, DagNodeDagFactory]
+    val mappings = ProvidersMap.empty[Id, DagNodeOrRef, DagNodeDagFactory, Ref]
     membersSelect.getValues(moduleContainerAlias.typ).map { member =>
       val typ = if (member.isModule) member.asModule.moduleClass.asType.toType 
         else if (member.isMethod) member.asMethod.returnType
@@ -96,9 +105,10 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     typ: Type,
     mappings: Providers[DagNodeOrRef]): Tree = {
 
-    val typeResolver = new TypeResolver(mappings, MapOfBuffers.empty)
+    val ref = Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos)
+    val typeResolver = new TypeResolver(mappings, MapOfBuffers.empty, mappings.topLevelRefs + ref)
 
-    val dag = typeResolver.resolveDagNodeOrRef(Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos), Nil)
+    val dag = typeResolver.resolveDagNodeOrRef(ref, Nil)
 
     val dagTree = dagToTree(dag)
     try {

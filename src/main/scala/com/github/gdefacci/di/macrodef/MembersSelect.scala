@@ -65,7 +65,7 @@ private[di] class MembersSelect[C <: Context](val context: C) {
         case m if isPublicMethod(m) && m.asMethod.isGetter && isBindInstance(m) =>
           val bindTyp = m.asMethod.returnType
           bindTyp.typeArgs match {
-            case List(abstractType, concreteType) => BindInstance(m.asMethod, abstractType.typeSymbol, concreteType.typeSymbol)
+            case List(abstractType, concreteType) => BindInstance(m.asMethod, abstractType, concreteType)
             case _ => context.abort(m.pos, s"Invalid bind type $bindTyp")
           }
         case m if m.isType && !m.isAbstract && getPrimaryConstructor(m.asType.toType).isDefined =>
@@ -108,7 +108,7 @@ private[di] class MembersSelect[C <: Context](val context: C) {
   case class ModuleContainerBinding(method:Symbol, typ:Type) extends Binding  
   case class PolyMethodBinding(method:MethodSymbol, methodType:PolyType) extends Binding  
   case class ObjectBinding(module:ModuleSymbol) extends Binding  
-  case class BindInstance(method:MethodSymbol, abstractType:Symbol, concreteType:Symbol) extends Binding
+  case class BindInstance(method:MethodSymbol, abstractType:Type, concreteType:Type) extends Binding
 
   def abstractMembers(t: context.universe.Type): Seq[MethodSymbol] = {
     if (isPrimitive(t)) Nil

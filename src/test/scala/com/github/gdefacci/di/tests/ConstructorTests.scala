@@ -299,7 +299,7 @@ class ConstructorTests extends FunSuite {
   test("ioc dependency 1") {
     import samples3._
 
-    val houseFactory = IOC.get[String => House](Module9, Module9A)
+    val houseFactory = IOC.get[String => House](Module9)
 
     assert(houseFactory("pippo") == House(Person("pippo", 33)))
   }
@@ -311,6 +311,16 @@ class ConstructorTests extends FunSuite {
 
     assert(r() == 3)
   }
+  
+  test("ioc dependency 2") {
+    import samples3._
+
+    val houseFactory = IOC.get[HouseFactory](Module9, Module9A)
+
+    assert(houseFactory.create("pippo") == House(Person("pippo", 33)))
+  }
+
+
 
   test("by name dependency") {
     import samples3._

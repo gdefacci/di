@@ -160,7 +160,7 @@ private[di] trait DagNodes[C <: Context] {
 
   }
 
-  type Providers[T] = ProvidersMap[Id, T, DagNodeDagFactory]
+  type Providers[T] = ProvidersMap[Id, T, DagNodeDagFactory, Ref]
 
   trait DagNodeDagFactory {
 

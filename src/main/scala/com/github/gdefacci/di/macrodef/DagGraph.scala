@@ -14,7 +14,7 @@ class DagGraph[C <: Context](val context: C) {
     typ: Type,
     mappings: td.Providers[td.DagNodeOrRef]): Tree = {
     
-    val typeResolver = new td.TypeResolver(mappings, MapOfBuffers.empty)
+    val typeResolver = new td.TypeResolver(mappings, MapOfBuffers.empty, mappings.topLevelRefs)
 
     val dag = typeResolver.resolveDagNodeOrRef(td.Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos), Nil)
 

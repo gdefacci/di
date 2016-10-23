@@ -6,14 +6,14 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
 
   import context.universe._
 
-  def alias[N >: DagNode <: DagNodeOrRef](exprNm:TermName, valueExpr: Tree, tpe:Type, kind:Kind, parent:Option[Dag[N]]):Dag[N] = {
+  def alias(exprNm:TermName, valueExpr: Tree, tpe:Type, kind:Kind, parent:Option[Dag[DagNodeOrRef]]):Dag[DagNodeOrRef] = {
     val vexpr = q"""
     val $exprNm = $valueExpr
     """
     parent.map { par =>
-      Dag[N](DagNode.value(kind, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)), par :: Nil)
+      Dag(DagNode.value(kind, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)), par :: Nil)
     }.getOrElse {
-      Dag[N](DagNode.value(kind, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)))
+      Dag(DagNode.value(kind, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)))
     }
   }
   
@@ -34,7 +34,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
       if (knd.ids.size > 1) {
         context.abort(par.pos, "parameters must have at most one identifier annotation")
       }
-      Dag[DagNodeOrRef](outboundParameterDag(Kind(knd.ids.head, knd.scope), par))
+      Dag(outboundParameterDag(Kind(knd.ids.head, knd.scope), par))
     })
     
   def methodDag(container: Dag[DagNodeOrRef],
@@ -44,7 +44,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     val parametersDags: Seq[Dag[DagNodeOrRef]] = paramListsDags(paramLists)
     assert(paramLists.map(_.length).sum == parametersDags.length)
     val knds = kindProvider(method)
-    knds.ids.map( id => Dag[DagNodeOrRef](DagNode.methodCall(Kind(id, knds.scope), Some(containerTermName), method), parametersDags.toSeq :+ container))
+    knds.ids.map( id => Dag(DagNode.methodCall(Kind(id, knds.scope), Some(containerTermName), method), parametersDags.toSeq :+ container))
   }
   
   def constructorDag(knd:Kind,
@@ -57,7 +57,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     }
     val parametersDags: Seq[Dag[DagNodeOrRef]] = paramListsDags(constructorMethod.paramLists)
     assert(parametersDags.length == constructorMethod.paramLists.map(_.length).sum)
-    Dag[DagNodeOrRef](DagNode.constructorCall(knd, exprType, constructorMethod, members), parametersDags)
+    Dag(DagNode.constructorCall(knd, exprType, constructorMethod, members), parametersDags)
   }
 
   
