@@ -48,9 +48,9 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
     value ${annotationStringAttribute(ann, "value")}"""
   }
 
-  private lazy val javaxInjectNamed = typeOf[javax.inject.Named]
-  private lazy val javaxInjectSingleton = typeOf[javax.inject.Singleton]
-  private lazy val javaxInjectQualifier = typeOf[javax.inject.Qualifier]
+  private val javaxInjectNamed = typeOf[javax.inject.Named]
+  private val javaxInjectSingleton = typeOf[javax.inject.Singleton]
+  private val javaxInjectQualifier = typeOf[javax.inject.Qualifier]
 
   private def annotationStringAttribute(annotation: Annotation, attr: String): Option[String] = {
     annotation.tree.children.tail.collectFirst {

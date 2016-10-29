@@ -18,10 +18,12 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
 
   class Stacker private (stack: collection.mutable.Stack[DagNodeOrRef]) {
 
-    def error(msg: String) = {
+    def message: String = {
+      stack.map(_.typ).distinct.map(hd => s"resolving ${hd}").mkString("\n")
+    }
 
-      val stackLog: String = stack.map(_.typ).distinct.map(hd => s"resolving ${hd}").mkString("\n")
-      context.abort(context.enclosingPosition, msg + stackLog)
+    def error(msg: String) = {
+      context.abort(context.enclosingPosition, msg + this.message)
     }
 
     def withStack(nd: DagNodeOrRef)(res: => Dag[DagNode]) = {
@@ -41,9 +43,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
   }
 
   object Stacker {
-
     def empty = new Stacker(collection.mutable.Stack.empty[DagNodeOrRef])
-
   }
 
   class TypeResolver(
@@ -54,14 +54,12 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
 
     private val currentSingletons: MapOfBuffers[Id, Dag[DagNode]] = MapOfBuffers.empty
 
-//    private def error(msg: String) = {
-//      stack.error(msg)
-//      //      val stackLog: String = stack.map(hd => s"resolving ${hd.typ}").mkString("\n")
-//      //      context.abort(context.enclosingPosition, msg + "\n" + stackLog)
-//    }
+    private def error(msg: String) = {
+      stack.error(msg)
+    }
 
     private def missingBindingError(id: Id, typ: Type) = {
-      stack.error(s"could not find a binding for $typ ${describeId(id)}")
+      error(s"could not find a binding for $typ ${describeId(id)}")
     }
 
     def resolveDagNodeOrRef(nd: DagNodeOrRef, inputs: Seq[Dag[DagNodeOrRef]]): Dag[DagNode] = {
@@ -91,7 +89,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
           }
           r
         case Seq(hd) => hd
-        case items => stack.error(s"more than one instance of $typ ${describeId(id)}: ${items.map(_.value).mkString(", ")}")
+        case items => error(s"more than one instance of $typ ${describeId(id)}: ${items.map(_.value).mkString(", ")}")
       }
     }
 
@@ -104,11 +102,11 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
           polyMembers match {
             case Seq() => instantiateRef(ref)
             case Seq(dag) => resolveDagNodeOrRef(dag.value, dag.inputs)
-            case _ => stack.error(s"found more than a polymorphic factory for $typ ${describeId(id)}")
+            case _ => error(s"found more than a polymorphic factory for $typ ${describeId(id)}")
           }
 
         case Seq(dag) => resolveDagNodeOrRef(dag.value, dag.inputs)
-        case _ => stack.error(s"found more than a polymorphic factory for $typ ${describeId(id)}")
+        case _ => error(s"found more than a polymorphic factory for $typ ${describeId(id)}")
       }
     }
 
@@ -151,11 +149,11 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
           else noBindingError
         } else {
           val constructorMethod = membersSelect.getPrimaryConstructor(typ).getOrElse {
-            stack.error(s"cant find primary constructor for ${typ.typeSymbol.fullName} resolving $typ ${describeId(id)}")
+            error(s"cant find primary constructor for ${typ.typeSymbol.fullName} resolving $typ ${describeId(id)}")
           }
           membersSelect.getPolyType(constructorMethod.returnType.etaExpand).map { polyType =>
             val dg = new PolyDagNodeFactory(ref.kind, None, constructorMethod, polyType).apply(ref.typ).getOrElse {
-              stack.error(s"error creating dag for polymorpic primary constructor for ${typ.typeSymbol.fullName} resolving $typ ${describeId(id)}")
+              error(s"error creating dag for polymorpic primary constructor for ${typ.typeSymbol.fullName} resolving $typ ${describeId(id)}")
             }
             resolveDagNodeOrRef(dg.value, dg.inputs)
           }.getOrElse {

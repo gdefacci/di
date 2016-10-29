@@ -7,7 +7,7 @@ private[di] trait DagNodes[C <: Context] {
 
   import context.universe._
 
-  lazy val reflectUtils = new ReflectUtils[context.type](context)
+  val reflectUtils = new ReflectUtils[context.type](context)
   val kindProvider = new DefaultKindProvider[context.type](context)
 
   object IdGen {
@@ -109,7 +109,7 @@ private[di] trait DagNodes[C <: Context] {
   object DagNode {
 
     private final class DagNodeImpl private[DagNode] (
-        lazyProviderSource: => ProviderSource,
+        val providerSource:ProviderSource,
         val kind: Kind,
         val name: String,
         val description: String,
@@ -118,8 +118,6 @@ private[di] trait DagNodes[C <: Context] {
         val dagToExpression: DagToExpression) extends DagNode(IdGen.next) {
 
       assert(typ != null, s"could not infer type on tree $description")
-
-      lazy val providerSource = lazyProviderSource
 
     }
 
@@ -136,7 +134,7 @@ private[di] trait DagNodes[C <: Context] {
       apply(ProviderSource.ValueSource, kind, s"$value", s"$value", typ, sourcePos, dagToExpression)
 
     def methodCall(kind: Kind, containerTermName: Option[TermName], method: Symbol) = {
-      lazy val methodSymbol = method.asMethod
+      val methodSymbol = method.asMethod
       val providerSource = new ProviderSource.MethodSource(method.asMethod)
       val mthdName = method.name.decodedName.toString
       val description = s"${method.owner.name}.${method.name}"
