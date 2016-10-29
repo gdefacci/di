@@ -20,4 +20,11 @@ class ErrorsTests extends  FunSuite with Matchers {
     "com.github.gdefacci.di.IOC.get[HouseFactory](Module9)" shouldNot compile
 
   }
+  
+  test("class cycles detection") {
+    import samples3._
+    
+    "com.github.gdefacci.di.IOC.getSource[ClR](1)" shouldNot compile
+    "com.github.gdefacci.di.IOC.getSource[ClR](1, ModCyc)" shouldNot compile
+  }
 }
