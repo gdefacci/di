@@ -7,7 +7,7 @@ private[di] class ReflectUtils[C <: Context](val context: C) {
   import context.universe._
 
   def methodCall(container: Option[TermName], method: MethodSymbol, args: Seq[Tree]) = {
-    val pars = Utils.byLengthsPartition(method.paramLists.map(_.length), args.toList)
+    val pars = byLengthsPartition(method.paramLists.map(_.length), args.toList)
     if (method.isConstructor) {
       q"new ${method.owner}(...$pars)"
     } else {
@@ -19,7 +19,7 @@ private[di] class ReflectUtils[C <: Context](val context: C) {
   }
 
   def methodCall(container: Option[TermName], method: MethodSymbol, typeArgs: Seq[Type], args: Seq[Tree]) = {
-    val pars = Utils.byLengthsPartition(method.paramLists.map(_.length), args.toList)
+    val pars = byLengthsPartition(method.paramLists.map(_.length), args.toList)
     if (method.isConstructor) {
       q"new ${method.owner}[..$typeArgs](...$pars)"
     } else {
@@ -32,7 +32,7 @@ private[di] class ReflectUtils[C <: Context](val context: C) {
 
   def newAbstractClass(typ: Symbol, paramss: List[List[Symbol]], arguments: Seq[Tree], members: Seq[Tree]): Tree = {
     val typName = TypeName(context.freshName(typ.name.decodedName.toString))
-    val pars = Utils.byLengthsPartition(paramss.map(_.length), arguments.toList)
+    val pars = byLengthsPartition(paramss.map(_.length), arguments.toList)
     q"""
     class $typName extends $typ(...$pars) {
       ..$members
@@ -49,4 +49,16 @@ private[di] class ReflectUtils[C <: Context](val context: C) {
   def isFunctionType(t: Symbol) =
     definitions.FunctionClass.seq.contains(t)
 
+  private def byLengthsPartition[T](lengths: Seq[Int], arguments: List[T]): List[List[T]] = {
+    assert(lengths.sum <= arguments.length, s"wrong number of arguments")
+    lengths match {
+      case Nil => Nil
+      case hd :: Nil =>
+        List(arguments.take(hd))
+      case hd +: rest =>
+        val (curr, restArgs) = arguments.splitAt(hd)
+        curr +: byLengthsPartition(rest, restArgs)
+    }
+  }  
+    
 }
