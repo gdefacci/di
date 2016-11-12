@@ -79,7 +79,7 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
       case (acc, membersSelect.PolyMethodBinding(member, polyType)) =>
         
         val knds = kindProvider(member)
-        acc.addPolyMembers(knds.ids.toSeq.map(id => id -> new PolyDagNodeFactory(Kind(id, knds.scope), Some(exprNm), member, polyType)))
+        acc.addPolyMembers(knds.ids.toSeq.map(id => id -> new PolyDagNodeFactory(Kind(id, knds.scope), Some(exprNm -> exprDag), member, polyType)))
         
     }
 

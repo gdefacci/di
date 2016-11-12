@@ -238,6 +238,15 @@ class ConstructorTests extends FunSuite {
     assert(Pippo("Pippy", 27) == p2)
 
   }
+  
+  test("polymorphic factory") {
+    import samples1._
+
+    val p1 = IOC.get[Option[Pippo]](ModPolymorphic0)
+
+    assert(None == p1)
+
+  }
 
   test("provider with implicit param") {
     import samples1._

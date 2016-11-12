@@ -167,7 +167,7 @@ private[di] trait DagNodes[C <: Context] {
 
   }
 
-  class PolyDagNodeFactory(val kind: Kind, containerTermName: Option[TermName], method: MethodSymbol, polyType: PolyType) extends DagNodeDagFactory {
+  class PolyDagNodeFactory(val kind: Kind, containerInfos: Option[(TermName, Dag[DagNodeOrRef])], method: MethodSymbol, polyType: PolyType) extends DagNodeDagFactory {
 
     val (typeArgs, underlying) = method.returnType match {
       case TypeRef(NoPrefix, underlying, args) => args -> underlying
@@ -226,7 +226,7 @@ private[di] trait DagNodes[C <: Context] {
 
           val providerSource = new ProviderSource.MethodSource(method)
           val description = s"$method[${substTypes.mkString(", ")}]"
-          val invoker: Seq[Tree] => Tree = { args => reflectUtils.methodCall(containerTermName, method, substTypes, args) }
+          val invoker: Seq[Tree] => Tree = { args => reflectUtils.methodCall(containerInfos.map(_._1), method, substTypes, args) }
 
           val nd =
             DagNode(providerSource, kind, method.name.toString, description,
@@ -234,7 +234,7 @@ private[di] trait DagNodes[C <: Context] {
               method.pos,
               DagToExpression(invoker))
 
-          Dag[DagNodeOrRef](nd, dagInputs)
+          Dag[DagNodeOrRef](nd, dagInputs ++ containerInfos.map(_._2).toList)
         }
       }
     }

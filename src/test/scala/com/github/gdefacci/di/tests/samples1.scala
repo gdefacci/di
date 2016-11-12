@@ -61,6 +61,12 @@ object samples1 {
 
   }
 
+  object ModPolymorphic0 {
+
+    def toOption[T]: Option[T] = None
+
+  }
+
   object ModImplicit1 {
 
     val a: Int = 1
@@ -132,5 +138,5 @@ object samples1 {
       }
     }
   }
-  
+
 }
