@@ -23,7 +23,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     }
 
     def error(msg: String) = {
-      context.abort(context.enclosingPosition, msg + this.message)
+      context.abort(context.enclosingPosition, msg +" "+ this.message)
     }
 
     def withStack(nd: DagNodeOrRef)(res: => Dag[DagNode]) = {

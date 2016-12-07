@@ -93,12 +93,20 @@ private[di] class DefaultKindProvider[C <: Context](val context: C) extends Kind
       None
   }
 
+  private def getAnnotations(m:Symbol):List[Annotation] = {
+    /** start - workaround to https://issues.scala-lang.org/browse/SI-7424 */
+    m.typeSignature
+    m.annotations.foreach(_.tree.tpe)
+    /** end   - workaround to https://issues.scala-lang.org/browse/SI-7424 */
+    m.annotations
+  }
+  
   def apply(sym: context.Symbol): Kinds = {
     Option(sym).map { sym =>
 
       val annotations = if (sym.isMethod) {
         val mthd = sym.asMethod
-        (if (mthd.isAccessor) mthd.accessed.annotations else Nil) ++ mthd.annotations
+        (if (mthd.isAccessor) getAnnotations(mthd.accessed) else Nil) ++ getAnnotations(mthd)
       } else if (sym.isParameter) {
         sym.annotations
       } else
