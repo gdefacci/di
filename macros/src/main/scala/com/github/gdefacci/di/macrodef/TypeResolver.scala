@@ -16,10 +16,10 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     case WithQualifier(nm, mp) => s"with qualifier $nm (${mp.mkString(", ")})"
   }
 
-  class Stacker private (stack: collection.mutable.Stack[DagNodeOrRef]) {
+  class Stacker private (stack: IndexStack[DagNodeOrRef]) {
 
     def message: String = {
-      stack.map(_.typ).distinct.map(hd => s"resolving ${hd}").mkString("\n")
+      stack.map(_.typ).distinct.map(hd => s"required by ${hd}").mkString("\n")
     }
 
     def error(msg: String) = {
@@ -27,23 +27,22 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     }
 
     def withStack(nd: DagNodeOrRef)(res: => Dag[DagNode]) = {
-      if (stack.contains(nd)) {
+      stack.push(nd, () => {
         val typ = nd.typ
         val id = nd.kind.id
-        error(s"cycle detected with type $typ ${describeId(id)}")
-      }
-      stack.push(nd)
+        error(s"cycle detected with type $typ ${describeId(id)}")        
+      })
       val r = res
       stack.pop
       r
     }
 
-    def copy() = new Stacker(stack.clone())
+    def copy() = new Stacker(stack.copy())
 
   }
-
+  
   object Stacker {
-    def empty = new Stacker(collection.mutable.Stack.empty[DagNodeOrRef])
+    def empty = new Stacker(new IndexStack[DagNodeOrRef])
   }
 
   class TypeResolver(
@@ -110,7 +109,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       }
     }
 
-    private def resolveMultiTargetRef(ref: Ref, itemType: Type) = {
+    private def resolveMultiTargetRef(ref: Ref, itemType: Type):Dag[DagNode] = {
       val Ref(Kind(id, _), typ, pos) = ref
       val insts: Seq[Dag[DagNodeOrRef]] = mappings.findMembers(id, (nd) => nd != ref && nd.typ <:< itemType)
       val desc = s"allBindings$itemType"
@@ -129,7 +128,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       }
     }
 
-    private def instantiateRef(ref: Ref) = {
+    private def instantiateRef(ref: Ref):Dag[DagNode] = {
       val Ref(Kind(id, _), typ, pos) = ref
 
       lazy val noBindingError = missingBindingError(id, typ)

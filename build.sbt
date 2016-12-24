@@ -1,9 +1,21 @@
-organization := "com.github.gdefacci"
-name := "macro-di"
-version := "0.1.0-SNAPSHOT"
+organization        in ThisBuild  := "com.github.gdefacci"
+version             in ThisBuild  := "0.2.0-SNAPSHOT"
+scalaVersion        in ThisBuild  := "2.11.8"
+crossScalaVersions  in ThisBuild  := Seq("2.11.8", "2.12.1") 
+scalacOptions       in ThisBuild  ++= Seq("-unchecked", "-deprecation", "-feature")
 
-crossScalaVersions := Seq("2.11.8", "2.12.1") 
+lazy val runtime = Project("runtime", file("runtime"))
+  .settings(Defaults.coreDefaultSettings)
 
-libraryDependencies <+= (scalaVersion)(sv => "org.scala-lang" % "scala-compiler" % sv)
-libraryDependencies += "com.github.jsr-330" % "core" % "1.4.0"
-libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" % "test"
+lazy val scalaReflect = Def.setting { "org.scala-lang" % "scala-reflect" % scalaVersion.value }
+  
+lazy val macros = Project("macros", file("macros"))
+  .settings(Defaults.coreDefaultSettings ++ Seq(
+    libraryDependencies += scalaReflect.value,
+    libraryDependencies += "com.github.jsr-330" % "core" % "1.4.0",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" 
+  )).dependsOn(runtime)
+
+lazy val root = Project("di", file(".")).aggregate(runtime, macros).settings(Seq(
+  publishArtifact := false
+))

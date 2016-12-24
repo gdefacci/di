@@ -9,7 +9,6 @@ private[di] trait DagToExpr[C <: Context] { self: DagNodes[C] =>
   import context.universe._
   import collection.mutable.{Set => MSet}
   
-//  val dagToTreeFun = Gen.fromDag[DagNode, Int](_.id, (d, inpts) => DagToExpression.singletonize(d.value.dagToExpression)(d, inpts)) _
   val dagToTreeFun = Gen.fromDag[DagNode, Int](_.id, (d, inpts) => d.value.dagToExpression(d, inpts)) _
   
   def dagToTree[T](dag: Dag[DagNode]): Tree = {
