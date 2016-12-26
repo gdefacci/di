@@ -8,23 +8,6 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
   import context.universe._
 
-//  private case class ModuleMappings(members: Seq[(Id, Dag[DagNodeOrRef])] = Nil, polyMembers: Seq[(Id, DagNodeDagFactory)] = Nil, 
-//      topLevelRefs:Set[Ref] = Set.empty[Ref], decoratorsMap:Seq[(Type, Decorator)] = Nil) {
-//    def addMember(id: Id, d: Dag[DagNodeOrRef]) = copy(members = members :+ (id -> d))
-//    def addDecorator(t:Type, dec:Decorator) = copy(decoratorsMap = decoratorsMap :+ (t -> dec))
-//    def addMembers(ms: Seq[(Id, Dag[DagNodeOrRef])]) = copy(members = members ++ ms)
-//    def addPolyMembers(ms: Seq[(Id, DagNodeDagFactory)]) = copy(polyMembers = polyMembers ++ ms)
-//    def addProviders(providers:Providers[DagNodeOrRef]) ={ 
-//      copy(members = members ++ providers.members.map( m => m.value.kind.id -> m ),
-//          polyMembers = polyMembers ++ providers.polyMembers.map( m => m.kind.id -> m),
-//          topLevelRefs = topLevelRefs ++ providers.topLevelRefs,
-//          decoratorsMap = decoratorsMap ++ providers.decorators)
-//    }
-//    def addTopLevelRefs(refs:Seq[Ref]) = {
-//      copy(topLevelRefs = topLevelRefs ++ refs)
-//    }
-//  }
-  
   private def createDagNodeOrRefProviders(moduleOrModuleContainerAlias:ExprAlias): Providers[DagNodeOrRef] = {
     val exprTyp = moduleOrModuleContainerAlias.typ
     if (membersSelect.isModuleContainerInstance(exprTyp)) {
@@ -67,6 +50,14 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
         } 
         
         val dec = Decorator( inpDags :+ exprDag, exprNm, member, selfIndex)
+        val knds = kindProvider(member)
+        
+        knds.ids.toList match {
+          case Nil => ()
+          case Global :: Nil => ()
+          case _ => context.abort(member.pos, "decorators cant be named / qualified")
+        }
+        if (knds.scope != DefaultScope) context.abort(member.pos, "decorators cant have scope annotation")
         
         acc.decoratorsBuffer += (member.returnType -> dec)
       
@@ -96,7 +87,6 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
         
         val knds = kindProvider(member)
         acc.polyMembersMap ++= (knds.ids.toSeq.map(id => id -> new PolyDagNodeFactory(Kind(id, knds.scope), Some(exprNm -> exprDag), member, polyType)))
-        acc
     }
 
     acc.membersMap += (exprDag.value.kind.id, exprDag)
