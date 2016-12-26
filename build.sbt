@@ -1,4 +1,4 @@
-organization        in ThisBuild  := "com.github.gdefacci"
+organization        in ThisBuild  := "com.github.gdefacci.di"
 version             in ThisBuild  := "0.2.0-SNAPSHOT"
 scalaVersion        in ThisBuild  := "2.11.8"
 crossScalaVersions  in ThisBuild  := Seq("2.11.8", "2.12.1") 
