@@ -28,14 +28,17 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     Ref(knd, parTyp, par.pos)
   }
 
-  private def paramListsDags(paramLists:List[List[Symbol]]) = 
+  private def paramListsRefs(paramLists:List[List[Symbol]]):List[Ref] = 
     paramLists.flatMap(pars => pars.map { par =>
       val knd = kindProvider(par)
       if (knd.ids.size > 1) {
         context.abort(par.pos, "parameters must have at most one identifier annotation")
       }
-      Dag(outboundParameterDag(Kind(knd.ids.head, knd.scope), par))
+      outboundParameterDag(Kind(knd.ids.head, knd.scope), par)
     })
+  
+  def paramListsDags(paramLists:List[List[Symbol]]) =
+    paramListsRefs(paramLists).map( par => Dag(par))
     
   def methodDag(container: Dag[DagNodeOrRef],
                 containerTermName: TermName,

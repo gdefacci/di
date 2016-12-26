@@ -16,7 +16,7 @@ class DagGraph[C <: Context](val context: C) {
     
     val typeResolver = new td.TypeResolver(mappings, MapOfBuffers.empty, mappings.topLevelRefs)
 
-    val dag = typeResolver.resolveDagNodeOrRef(td.Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos), Nil)
+    val dag = typeResolver.resolveRef(td.Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos))
 
     val graphNodes = dag.visit.map(toDependencyTree)
     context.typecheck(q"List(..$graphNodes)")

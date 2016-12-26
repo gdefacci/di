@@ -27,7 +27,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     }
 
     def withStack(nd: DagNodeOrRef)(res: => Dag[DagNode]) = {
-      stack.push(nd, () => {
+      stack.pushIfNotDuplicated(nd, () => {
         val typ = nd.typ
         val id = nd.kind.id
         error(s"cycle detected with type $typ ${describeId(id)}")        
@@ -44,7 +44,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
   object Stacker {
     def empty = new Stacker(new IndexStack[DagNodeOrRef])
   }
-
+  
   class TypeResolver(
       mappings: Providers[DagNodeOrRef],
       dagProviders: MapOfBuffers[Id, Dag[DagNode]],
@@ -56,21 +56,39 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     private def error(msg: String) = {
       stack.error(msg)
     }
-
+    
     private def missingBindingError(id: Id, typ: Type) = {
       error(s"could not find a binding for $typ ${describeId(id)}")
     }
 
-    def resolveDagNodeOrRef(nd: DagNodeOrRef, inputs: Seq[Dag[DagNodeOrRef]]): Dag[DagNode] = {
+   
+    def decorate(res:Dag[DagNode]) = {
+      val decs = mappings.getDecorators(res.value.typ weak_<:< _)
+      if (decs.size > 1) error("found more than a decorator for type "+res.value.typ)
+      else {
+        decs.headOption.map { dec =>
+          Dag(DagNode(res.value.providerSource, res.value.kind, res.value.name+"Decorator", res.value.description+"Decorator", 
+              res.value.typ, res.value.sourcePos, DagToExpressionFactory.decorator(dec.containerTermName, dec.method, dec.selfIndex)),
+              res :: dec.inputs.map { dg => 
+                resolveDagNodeOrRef(dg.value, dg.inputs) 
+            }.toList )
+        } .getOrElse {
+          res
+        }
+      }
+    }
+    
+    private def resolveDagNodeOrRef(nd: DagNodeOrRef, inputs: Seq[Dag[DagNodeOrRef]]): Dag[DagNode] = {
       nd match {
         case ref @ Ref(_, _, _) =>
           assert(inputs.isEmpty, "refs must have no inputs")
           resolveRef(ref)
-        case nd: DagNode => resolveDagNode(nd, inputs)
+        case nd: DagNode => 
+          resolveDagNode(nd, inputs)
       }
     }
 
-    private def resolveRef(ref: Ref): Dag[DagNode] = {
+    def resolveRef(ref: Ref): Dag[DagNode] = {
       val Ref(Kind(id, _), typ, _) = ref
 
       val rs = dagProviders.find(id, nd => nd.value != ref && nd.value.typ <:< typ)
@@ -111,15 +129,14 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
 
     private def resolveMultiTargetRef(ref: Ref, itemType: Type):Dag[DagNode] = {
       val Ref(Kind(id, _), typ, pos) = ref
-      val insts: Seq[Dag[DagNodeOrRef]] = mappings.findMembers(id, (nd) => nd != ref && nd.typ <:< itemType)
+      val insts: Seq[Dag[DagNode]] = 
+        mappings.findMembers(id, (nd) => nd != ref && nd.typ <:< itemType).map( dg => resolveDagNodeOrRef(dg.value, dg.inputs))
       val desc = s"allBindings$itemType"
-      val nd = DagNode(new ProviderSource.AllbindingsSource(itemType.typeSymbol.asType),
+      Dag( DagNode(new ProviderSource.AllbindingsSource(itemType.typeSymbol.asType),
         Kind.default,
         desc, desc,
         typ, pos,
-        DagToExpression(inps => q"new com.github.gdefacci.di.runtime.AllBindings[$itemType]( List[$itemType](..$inps) )"))
-
-      resolveDagNode(nd, insts)
+        DagToExpression(inps => q"new com.github.gdefacci.di.runtime.AllBindings[$itemType]( List[$itemType](..$inps) )")), insts)
     }
 
     private def resolveDagNode(nd: DagNode, inputs: Seq[Dag[DagNodeOrRef]]): Dag[DagNode] = {
@@ -221,7 +238,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
 
     private def resolveSeparate(typ: Type, parametersBindings: Seq[(Id, Dag[DagNodeOrRef])]): Dag[DagNode] = {
       val nmappings: Providers[DagNodeOrRef] = mappings.copy()
-      nmappings ++= parametersBindings
+      nmappings.membersMap ++= parametersBindings
       val dagProviders = this.dagProviders.copy
 
       val tr = new TypeResolver(nmappings, dagProviders, topLevelRefs, stack.copy())

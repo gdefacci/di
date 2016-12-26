@@ -49,8 +49,10 @@ private[di] trait DagNodes[C <: Context] {
     }
   }
 
+  case class Decorator(inputs: Seq[Dag[DagNodeOrRef]], containerTermName: TermName,  method:MethodSymbol, selfIndex: Int)
+  
   type DagToExpression = (Dag[DagNode], Seq[Dag[Gen.Expression]]) => Gen.Expression
-
+  
   object DagToExpression {
 
     def apply(termName: TermName, value: Tree): DagToExpression = { (dag, deps) =>
@@ -130,10 +132,10 @@ private[di] trait DagNodes[C <: Context] {
       sourcePos: Position,
       dagToExpression: DagToExpression): DagNode = new DagNodeImpl(providerSource, kind, name, description, typ, sourcePos, dagToExpression)
 
-    def value(kind: Kind, value: Tree, typ: Type, sourcePos: Position, dagToExpression: DagToExpression) =
+    def value(kind: Kind, value: Tree, typ: Type, sourcePos: Position, dagToExpression: DagToExpression):DagNode =
       apply(ProviderSource.ValueSource, kind, s"$value", s"$value", typ, sourcePos, dagToExpression)
 
-    def methodCall(kind: Kind, containerTermName: Option[TermName], method: Symbol) = {
+    def methodCall(kind: Kind, containerTermName: Option[TermName], method: Symbol):DagNode = {
       val methodSymbol = method.asMethod
       val providerSource = new ProviderSource.MethodSource(method.asMethod)
       val mthdName = method.name.decodedName.toString
@@ -158,7 +160,7 @@ private[di] trait DagNodes[C <: Context] {
 
   }
 
-  type Providers[T] = ProvidersMap[Id, T, DagNodeDagFactory, Ref]
+  type Providers[T] = ProvidersMap[Id, T, DagNodeDagFactory, Ref, Type, Decorator]
 
   trait DagNodeDagFactory {
 

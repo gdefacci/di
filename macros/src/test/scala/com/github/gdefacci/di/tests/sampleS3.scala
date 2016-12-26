@@ -2,6 +2,7 @@ package com.github.gdefacci.di.tests
 
 import javax.inject.Singleton
 import com.github.gdefacci.di.runtime.Bind
+import com.github.gdefacci.di.runtime.AllBindings
 
 object samples3 {
 
@@ -69,4 +70,32 @@ object samples3 {
   
   }
 
+  object DecorateString {
+    
+    def decorateString(str:String):String = ">>>" + str;
+    
+  }
+  
+  object DecoratorModule1 {
+    
+    def string(i:Int) = "*" * i
+    
+    def decorateString(str:String, i:Int):String = "<" + i + ">" + str
+  }
+  
+  object DecoratorModule2 {
+    
+    def decorateString(str:String, i:Int):String = "<" + i + ">" + str
+    
+    def stringSet(allstr:AllBindings[String]) = allstr.values.toSet
+  }
+  
+  object DecoratorModule2aaa {
+    
+    val a = "12"
+    		val b = "332"
+    		val c = "412"
+  }
+  
+  
 }

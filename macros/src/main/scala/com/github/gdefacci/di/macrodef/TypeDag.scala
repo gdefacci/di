@@ -8,19 +8,22 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
   import context.universe._
 
-  private case class ModuleMappings(members: Seq[(Id, Dag[DagNodeOrRef])], polyMembers: Seq[(Id, DagNodeDagFactory)], topLevelRefs:Set[Ref]) {
-    def addMember(id: Id, d: Dag[DagNodeOrRef]) = copy(members = members :+ (id -> d))
-    def addMembers(ms: Seq[(Id, Dag[DagNodeOrRef])]) = copy(members = members ++ ms)
-    def addPolyMembers(ms: Seq[(Id, DagNodeDagFactory)]) = copy(polyMembers = polyMembers ++ ms)
-    def addProviders(providers:Providers[DagNodeOrRef]) ={ 
-      copy(members = members ++ providers.members.map( m => m.value.kind.id -> m ),
-          polyMembers = polyMembers ++ providers.polyMembers.map( m => m.kind.id -> m),
-          topLevelRefs = topLevelRefs ++ providers.topLevelRefs)
-    }
-    def addTopLevelRefs(refs:Seq[Ref]) = {
-      copy(topLevelRefs = topLevelRefs ++ refs)
-    }
-  }
+//  private case class ModuleMappings(members: Seq[(Id, Dag[DagNodeOrRef])] = Nil, polyMembers: Seq[(Id, DagNodeDagFactory)] = Nil, 
+//      topLevelRefs:Set[Ref] = Set.empty[Ref], decoratorsMap:Seq[(Type, Decorator)] = Nil) {
+//    def addMember(id: Id, d: Dag[DagNodeOrRef]) = copy(members = members :+ (id -> d))
+//    def addDecorator(t:Type, dec:Decorator) = copy(decoratorsMap = decoratorsMap :+ (t -> dec))
+//    def addMembers(ms: Seq[(Id, Dag[DagNodeOrRef])]) = copy(members = members ++ ms)
+//    def addPolyMembers(ms: Seq[(Id, DagNodeDagFactory)]) = copy(polyMembers = polyMembers ++ ms)
+//    def addProviders(providers:Providers[DagNodeOrRef]) ={ 
+//      copy(members = members ++ providers.members.map( m => m.value.kind.id -> m ),
+//          polyMembers = polyMembers ++ providers.polyMembers.map( m => m.kind.id -> m),
+//          topLevelRefs = topLevelRefs ++ providers.topLevelRefs,
+//          decoratorsMap = decoratorsMap ++ providers.decorators)
+//    }
+//    def addTopLevelRefs(refs:Seq[Ref]) = {
+//      copy(topLevelRefs = topLevelRefs ++ refs)
+//    }
+//  }
   
   private def createDagNodeOrRefProviders(moduleOrModuleContainerAlias:ExprAlias): Providers[DagNodeOrRef] = {
     val exprTyp = moduleOrModuleContainerAlias.typ
@@ -45,51 +48,127 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     val exprNm = exprAlias.termName
     val exprDag = exprAlias.dag
     
-    val membersMapping = membersSelect.getBindings(exprAlias.typ).foldLeft(ModuleMappings(Nil, Nil, Set.empty)) {
-      case (acc, membersSelect.MethodBinding(member)) =>
+    val acc = ProvidersMap.empty[Id, DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator]
+    
+    membersSelect.getBindings(exprAlias.typ).foreach {
+      case membersSelect.MethodBinding(member) =>
       
         val dgs = methodDag(exprDag, exprNm, member).toSeq.flatMap {
           case dg @ Dag(dn: DagNode, _) => (dn.kind.id -> dg) :: Nil
           case _ => Nil
         }
-        acc.addMembers(dgs)
+        acc.membersMap ++= dgs
         
-      case (acc, membersSelect.BindInstance(member, abstractType, concreteType)) =>
+      case membersSelect.DecoratorBinding(member, selfIndex) =>
+      
+        val inpDags = paramListsDags(member.paramLists).zipWithIndex flatMap {
+          case (x, idx) if (idx == selfIndex) => Nil
+          case (x,_) => List(x)
+        } 
+        
+        val dec = Decorator( inpDags :+ exprDag, exprNm, member, selfIndex)
+        
+        acc.decoratorsBuffer += (member.returnType -> dec)
+      
+      case membersSelect.BindInstance(member, abstractType, concreteType) =>
         
         val knds = kindProvider(member)
         val refs = knds.ids.toSeq.map(id => Ref(Kind(id, knds.scope), concreteType, member.pos))
         
-        val acc1 = acc.addMembers(refs.map( r => (r.kind.id -> Dag(r) )))
+        acc.membersMap ++= (refs.map( r => (r.kind.id -> Dag(r) )))
         if (abstractType == concreteType) {
-          acc1.addTopLevelRefs(refs)
-        } else acc1
+          acc.topLevelRefsSet ++= refs
+        } 
       
-      case (acc, membersSelect.ModuleContainerBinding(member, typ)) =>
+      case membersSelect.ModuleContainerBinding(member, typ) =>
         
         val memAlias = new ExprAlias(q"${exprAlias.termName}.${member.name.toTermName}",typ, Some(exprAlias.dag))
         val prvdrs = moduleContainerDagNodeOrRefProviders(memAlias)
-        acc.addProviders(prvdrs)
+        acc ++= prvdrs
       
-      case (acc, membersSelect.ObjectBinding(moduleSymbol)) =>
+      case membersSelect.ObjectBinding(moduleSymbol) =>
         
         val typ = moduleSymbol.asModule.moduleClass.asType.toType  
         val memAlias = new ExprAlias(q"${exprAlias.termName}.${moduleSymbol.name}",typ, Some(exprAlias.dag))
-        acc.addMember(memAlias.dag.value.kind.id, memAlias.dag)
-
-      case (acc, membersSelect.PolyMethodBinding(member, polyType)) =>
+        acc.membersMap += (memAlias.dag.value.kind.id, memAlias.dag)
+        
+      case membersSelect.PolyMethodBinding(member, polyType) =>
         
         val knds = kindProvider(member)
-        acc.addPolyMembers(knds.ids.toSeq.map(id => id -> new PolyDagNodeFactory(Kind(id, knds.scope), Some(exprNm -> exprDag), member, polyType)))
-        
+        acc.polyMembersMap ++= (knds.ids.toSeq.map(id => id -> new PolyDagNodeFactory(Kind(id, knds.scope), Some(exprNm -> exprDag), member, polyType)))
+        acc
     }
 
-    val allMappings = membersMapping.addMember(exprDag.value.kind.id, exprDag)
+    acc.membersMap += (exprDag.value.kind.id, exprDag)
 
-    ProvidersMap(allMappings.members, allMappings.polyMembers, allMappings.topLevelRefs)
+    acc
   }
   
+//  private def moduleDagNodeOrRefProviders_old(exprAlias:ExprAlias): Providers[DagNodeOrRef] = {
+//    val exprNm = exprAlias.termName
+//    val exprDag = exprAlias.dag
+//    
+//    val z = ProvidersMap.empty[Id, DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator]
+//    
+//    val membersMapping = membersSelect.getBindings(exprAlias.typ).foldLeft(z) {
+//      case (acc, membersSelect.MethodBinding(member)) =>
+//      
+//        val dgs = methodDag(exprDag, exprNm, member).toSeq.flatMap {
+//          case dg @ Dag(dn: DagNode, _) => (dn.kind.id -> dg) :: Nil
+//          case _ => Nil
+//        }
+//        acc.membersMap ++= dgs 
+//        acc
+//      case (acc, membersSelect.DecoratorBinding(member, selfIndex)) =>
+//      
+//        val inpDags = paramListsDags(member.paramLists).zipWithIndex flatMap {
+//          case (x, idx) if (idx == selfIndex) => Nil
+//          case (x,_) => List(x)
+//        } 
+//        
+//        val dec = Decorator( inpDags :+ exprDag, exprNm, member, selfIndex)
+//        
+//        acc.decoratorsBuffer += (member.returnType -> dec)
+//        acc
+//      case (acc, membersSelect.BindInstance(member, abstractType, concreteType)) =>
+//        
+//        val knds = kindProvider(member)
+//        val refs = knds.ids.toSeq.map(id => Ref(Kind(id, knds.scope), concreteType, member.pos))
+//        
+//        acc.membersMap ++= (refs.map( r => (r.kind.id -> Dag(r) )))
+//        if (abstractType == concreteType) {
+//          acc.topLevelRefsSet ++= refs
+//        } 
+//        acc
+//      
+//      case (acc, membersSelect.ModuleContainerBinding(member, typ)) =>
+//        
+//        val memAlias = new ExprAlias(q"${exprAlias.termName}.${member.name.toTermName}",typ, Some(exprAlias.dag))
+//        val prvdrs = moduleContainerDagNodeOrRefProviders(memAlias)
+//        acc ++= prvdrs
+//        acc
+//      
+//      case (acc, membersSelect.ObjectBinding(moduleSymbol)) =>
+//        
+//        val typ = moduleSymbol.asModule.moduleClass.asType.toType  
+//        val memAlias = new ExprAlias(q"${exprAlias.termName}.${moduleSymbol.name}",typ, Some(exprAlias.dag))
+//        acc.membersMap += (memAlias.dag.value.kind.id, memAlias.dag)
+//        acc
+//      case (acc, membersSelect.PolyMethodBinding(member, polyType)) =>
+//        
+//        val knds = kindProvider(member)
+//        acc.polyMembersMap ++= (knds.ids.toSeq.map(id => id -> new PolyDagNodeFactory(Kind(id, knds.scope), Some(exprNm -> exprDag), member, polyType)))
+//        acc
+//    }
+//
+//    membersMapping.membersMap += (exprDag.value.kind.id, exprDag)
+//
+//    membersMapping
+//  }
+
+  
   private def moduleContainerDagNodeOrRefProviders(moduleContainerAlias:ExprAlias): Providers[DagNodeOrRef] = {
-    val mappings = ProvidersMap.empty[Id, DagNodeOrRef, DagNodeDagFactory, Ref]
+    val mappings = ProvidersMap.empty[Id, DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator]
     membersSelect.getValues(moduleContainerAlias.typ).map { member =>
       val typ = if (member.isModule) member.asModule.moduleClass.asType.toType 
         else if (member.isMethod) member.asMethod.returnType
@@ -108,9 +187,11 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
     val ref = Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos)
     val typeResolver = new TypeResolver(mappings, MapOfBuffers.empty, mappings.topLevelRefs + ref)
 
-    val dag = typeResolver.resolveDagNodeOrRef(ref, Nil)
-
-    val dagTree = dagToTree(dag)
+    val dag = typeResolver.resolveRef(ref)
+    val decDag = Dag.mapValues(dag, (nd:DagNode) => nd.id) { (d, inps:Seq[Dag[DagNode]]) =>
+      typeResolver.decorate(Dag(d.value, inps))
+    }
+    val dagTree = dagToTree(decDag)
     try {
       context.typecheck(dagTree)
     } catch {

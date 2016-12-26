@@ -2,6 +2,7 @@ package com.github.gdefacci.di.tests
 
 import com.github.gdefacci.di.IOC
 import org.scalatest.FunSuite
+import com.github.gdefacci.di.runtime.AllBindings
 
 class ConstructorTests extends FunSuite {
 
@@ -369,6 +370,28 @@ class ConstructorTests extends FunSuite {
     
     assert(ts.client == cl1)
     
+  }
+
+  test("string decorate") {
+    import samples3._
+
+    val s1 = IOC.get[String](DecorateString, "blah")
+
+    assert(">>>blah" == s1)
+  }
+  
+  test("string decorate common dependency") {
+    import samples3._
+    
+    assert("<2>**" == IOC.get[String](DecoratorModule1, 2) )
+  }
+  
+  test("string decorate multi") {
+    import samples3._
+    
+    assert( IOC.get[AllBindings[String]](DecoratorModule2, 12, "ab", "ba").values.toList == List("<12>ab", "<12>ba") )
+    
+    assert( IOC.get[Set[String]](DecoratorModule2, 12, DecoratorModule2aaa) == Set("<12>412", "<12>332", "<12>12"))
   }
 
 }

@@ -4,7 +4,7 @@ class IndexStack[T](var elements:List[T] = Nil) {
   
   def map[B](f:T => B):List[B] = elements.map(f)
   
-  def push(itm:T, onDuplicate: () => Unit):Unit = {
+  def pushIfNotDuplicated(itm:T, onDuplicate: () => Unit):Unit = {
     if (elements.contains(itm)) {
       onDuplicate()
     } else {
