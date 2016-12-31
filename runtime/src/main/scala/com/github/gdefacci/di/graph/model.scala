@@ -25,6 +25,7 @@ final case class QualifierTag(qualifierName: String, values: Map[String, Any]) e
 sealed trait ProviderSource
 final case class ConstructorSource(className:String) extends ProviderSource
 final case class MethodSource(owner:String, methodName:String) extends ProviderSource
+final case class DecoratorSource(owner:String, methodName:String) extends ProviderSource
 final case object ValueSource extends ProviderSource
 
 sealed trait DependencyScope

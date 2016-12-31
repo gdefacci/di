@@ -103,6 +103,7 @@ private[di] trait DagNodes[C <: Context] {
   object ProviderSource {
 
     case class MethodSource(method: MethodSymbol) extends ProviderSource
+    case class DecoratorSource(method: MethodSymbol) extends ProviderSource
     case class ConstructorSource(method: MethodSymbol) extends ProviderSource
     case object ValueSource extends ProviderSource
     case class AllbindingsSource(itemType: TypeSymbol) extends ProviderSource

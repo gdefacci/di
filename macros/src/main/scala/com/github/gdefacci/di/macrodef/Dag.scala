@@ -32,7 +32,7 @@ private[di] object Dag {
     mapValues[T, T, Dag[T]](dag, dg => dg)((nd, inps) => f(nd.value, inps))
   }
 
-  def mapValues[A, ID, B](d:Dag[A], keyf:A => ID)(f:(Dag[A], Seq[B]) => B) = {
+  def mapValues[A, ID, B](d:Dag[A], keyf:A => ID)(f:(Dag[A], Seq[B]) => B):B = {
     val mp = d.fold[Map[ID, B]](Map.empty) { (acc, dg) =>
       val k = keyf(dg.value)
       acc.get(k) match {

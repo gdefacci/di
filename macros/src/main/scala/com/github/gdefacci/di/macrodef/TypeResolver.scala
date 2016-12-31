@@ -67,7 +67,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
       if (decs.size > 1) error("found more than a decorator for type "+res.value.typ)
       else {
         decs.headOption.map { dec =>
-          Dag(DagNode(res.value.providerSource, res.value.kind, res.value.name+"Decorator", res.value.description+"Decorator", 
+          Dag(DagNode(ProviderSource.DecoratorSource(dec.method), res.value.kind, res.value.name+"Decorator", res.value.description+"Decorator", 
               res.value.typ, res.value.sourcePos, DagToExpressionFactory.decorator(dec.containerTermName, dec.method, dec.selfIndex)),
               res :: dec.inputs.map { dg => 
                 resolveDagNodeOrRef(dg.value, dg.inputs) 
@@ -106,7 +106,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
           }
           r
         case Seq(hd) => hd
-        case items => error(s"more than one instance of $typ ${describeId(id)}: ${items.map(_.value).mkString(", ")}")
+        case items => error(s"more than one value of $typ ${describeId(id)}: ${items.map(_.value).mkString(", ")}")
       }
     }
 
@@ -123,7 +123,7 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
           }
 
         case Seq(dag) => resolveDagNodeOrRef(dag.value, dag.inputs)
-        case _ => error(s"found more than a polymorphic factory for $typ ${describeId(id)}")
+        case _ => error(s"found more than a value for $typ ${describeId(id)}")
       }
     }
 

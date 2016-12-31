@@ -37,14 +37,6 @@ private[di] class ProvidersMap[KI, T, TF, RF, TYP, DEC] private (
   def findPolymorphicMembers[R](kid: KI, select: TF => Option[R]): Seq[R] =
     polyMembersMap.values(kid).map(select).collect { case Some(v) => v }
 
-//  def +=(e: (KI, Dag[T])): Unit = membersMap += (e._1, e._2)
-//  def ++=(mp: Seq[(KI, Dag[T])]): Unit = membersMap ++= mp
-//
-//  object poly {
-//    def +=(e: (KI, TF)): Unit = polyMembersMap += (e._1, e._2)
-//    def ++=(mp: Seq[(KI, TF)]): Unit = polyMembersMap ++= mp
-//  }
-
   def ++=(e: ProvidersMap[KI, T, TF, RF, TYP, DEC]): Unit = {
     membersMap ++= e.membersMap
     polyMembersMap ++= e.polyMembersMap

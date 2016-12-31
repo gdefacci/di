@@ -74,6 +74,7 @@ class DagGraph[C <: Context](val context: C) {
 
     val providerSrc = dag.value.providerSource match {
       case td.ProviderSource.MethodSource(m) => q"com.github.gdefacci.di.graph.MethodSource(${m.owner.fullName}, ${m.name.decodedName.toString})"
+      case td.ProviderSource.DecoratorSource(m) => q"com.github.gdefacci.di.graph.DecoratorSource(${m.owner.fullName}, ${m.name.decodedName.toString})"
       case td.ProviderSource.ConstructorSource(c) => q"com.github.gdefacci.di.graph.ConstructorSource(${c.owner.fullName})"
       case _ => q"com.github.gdefacci.di.graph.ValueSource"
     }

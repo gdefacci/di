@@ -239,7 +239,7 @@ class ConstructorTests extends FunSuite {
     assert(Pippo("Pippy", 27) == p2)
 
   }
-  
+
   test("polymorphic factory") {
     import samples1._
 
@@ -321,7 +321,7 @@ class ConstructorTests extends FunSuite {
 
     assert(r() == 3)
   }
-  
+
   test("ioc dependency 2") {
     import samples3._
 
@@ -330,7 +330,14 @@ class ConstructorTests extends FunSuite {
     assert(houseFactory.create("pippo") == House(Person("pippo", 33)))
   }
 
+  test("ioc dependency 3") {
+    import samples3._
 
+    val mff = IOC.get[(Int => String) => MyFactory]()
+
+    assert("12" == mff(_.toString).factory(12))
+
+  }
 
   test("by name dependency") {
     import samples3._
@@ -339,7 +346,7 @@ class ConstructorTests extends FunSuite {
 
     assert(r == "3")
   }
-  
+
   test("parameter independent singleton in trait") {
     import samples3._
 
@@ -347,29 +354,29 @@ class ConstructorTests extends FunSuite {
 
     val r1 = cf.f1(2)
     val r2 = cf.f2(true)
-    
+
     assert(r1.p == r2.p)
   }
-  
+
   test("parameter dependent singleton") {
     import samples3._
 
     val s1 = IOC.get[Serv1](ModuleServ1, true)
 
     val s3 = s1.f("txt")
-    
+
     assert(s3.a.s == s3.b.s)
   }
-  
+
   test("parameter independent singleton in function") {
 
     import com.github.gdefacci.di.twittersample._
     val ts = IOC.get[TweeterService1](TwitterModule1)
 
     val cl1 = ts.f(User("")).api.httpClient
-    
+
     assert(ts.client == cl1)
-    
+
   }
 
   test("string decorate") {
@@ -379,19 +386,19 @@ class ConstructorTests extends FunSuite {
 
     assert(">>>blah" == s1)
   }
-  
+
   test("string decorate common dependency") {
     import samples3._
-    
-    assert("<2>**" == IOC.get[String](DecoratorModule1, 2) )
+
+    assert("<2>**" == IOC.get[String](DecoratorModule1, 2))
   }
-  
+
   test("string decorate multi") {
     import samples3._
-    
-    assert( IOC.get[AllBindings[String]](DecoratorModule2, 12, "ab", "ba").values.toList == List("<12>ab", "<12>ba") )
-    
-    assert( IOC.get[Set[String]](DecoratorModule2, 12, DecoratorModule2aaa) == Set("<12>412", "<12>332", "<12>12"))
+
+    assert(IOC.get[AllBindings[String]](DecoratorModule2, 12, "ab", "ba").values.toList == List("<12>ab", "<12>ba"))
+
+    assert(IOC.get[Set[String]](DecoratorModule2, 12, DecoratorModule2aaa) == Set("<12>412", "<12>332", "<12>12"))
   }
 
 }

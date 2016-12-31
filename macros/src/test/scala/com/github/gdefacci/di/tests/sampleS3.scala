@@ -97,4 +97,6 @@ object samples3 {
     val c = "412"
   }
 
+  class MyFactory(val factory:Int => String)
+  
 }
