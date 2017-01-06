@@ -3,6 +3,7 @@ package com.github.gdefacci.di.tests
 import javax.inject.{Named, Singleton}
 
 import com.github.gdefacci.di.runtime.Bind
+import com.github.gdefacci.di.runtime.AllBindings
 
 object samples2 {
 
@@ -79,6 +80,8 @@ object samples2 {
   
   case class Tag[+K,+V](value:V)
   
+  type ^ [+K,+V] = Tag[K,V]
+  
   class WithKey[K] {
     def apply[V](v:V) = Tag[K,V](v)
   }
@@ -89,9 +92,9 @@ object samples2 {
   object Id1
   object Id2
   
-  object module5TagMulti {
+  object module5TagSingleSource {
     
-    def create(r1:Tag[Id1.type,Repository], r2:Tag[Id2.type,Repository]) = ServiceDRepo(r1.value,r2.value)
+    def create(r1:Id1.type ^ Repository, r2:Id2.type ^ Repository) = ServiceDRepo(r1.value,r2.value)
 
     val repo1 = WithKey[Id1.type with Id2.type](new TestRepo(false))
     
@@ -105,6 +108,38 @@ object samples2 {
     val repo2 = WithKey[Id2.type](new TestRepo(true))
     
   }
+  
+  object module5TagAndMultiMatchAll {
+    
+    def create(all:AllBindings[Tag[Any,Repository]]):Seq[Repository] = all.values.map(_.value)
+
+    val repo1 = WithKey[Id1.type](new TestRepo(false))
+    val repo2 = WithKey[Id2.type](new TestRepo(true))
+    
+  }
+  
+  object module5TagAndMulti {
+    
+    def create(all:AllBindings[Tag[Id1.type,Repository]]):Seq[Repository] = all.values.map(_.value)
+
+    val repo1 = WithKey[Id1.type](new TestRepo(false))
+    val repo2 = WithKey[Id1.type](new TestRepo(true))
+    
+    val repo3 = WithKey[Id2.type](new SqlRepo(new Connection(new User("aaa"))))
+    
+  }
+
+  object module5TagBindTag {
+    
+    def create(r1:Tag[Id1.type,Repository], r2:Tag[Id2.type,Repository]) = ServiceDRepo(r1.value,r2.value)
+
+    val bool = false
+    
+    val repo1 = Bind.bind[Tag[Id1.type, TestRepo]]
+    val repo2 = Bind.bind[Tag[Id2.type, TestRepo]]
+    
+  }
+  
   
   object module5Bind {
     

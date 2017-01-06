@@ -133,9 +133,37 @@ class ConstructorTests extends FunSuite {
   test("type tag single source") {
     import samples2._
 
-    val service = IOC.get[ServiceDRepo](samples2.module5TagMulti)
+    val service = IOC.get[ServiceDRepo](samples2.module5TagSingleSource)
     assert(service.repo1 == new TestRepo(false))
     assert(service.repo2 == service.repo1)
+  }
+
+  test("type tag multi") {
+    import samples2._
+
+    val repos = IOC.get[Seq[Repository]](samples2.module5TagAndMulti)
+    assert(repos.length == 2)
+    assert(repos.exists( _ == new TestRepo(true)))
+    assert(repos.exists( _ == new TestRepo(false)))
+    
+  }
+    
+  test("type tag multi match all") {
+    import samples2._
+
+    val repos = IOC.get[Seq[Repository]](samples2.module5TagAndMultiMatchAll)
+    assert(repos.length == 2)
+    assert(repos.exists( _ == new TestRepo(true)))
+    assert(repos.exists( _ == new TestRepo(false)))
+    
+  }
+
+  test("type tag single bind") {
+    import samples2._
+
+    val service = IOC.get[ServiceDRepo](samples2.module5TagBindTag)
+    assert(service.repo1 == new TestRepo(false))
+    assert(service.repo2 == new TestRepo(false))
   }
 
   test("qualifier") {
