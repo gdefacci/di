@@ -121,6 +121,22 @@ class ConstructorTests extends FunSuite {
     assert(service.repo1 == new TestRepo(false))
     assert(service.repo2 == new TestRepo(true))
   }
+  
+  test("type tag") {
+    import samples2._
+
+    val service = IOC.get[ServiceDRepo](samples2.module5Tag)
+    assert(service.repo1 == new TestRepo(false))
+    assert(service.repo2 == new TestRepo(true))
+  }
+  
+  test("type tag single source") {
+    import samples2._
+
+    val service = IOC.get[ServiceDRepo](samples2.module5TagMulti)
+    assert(service.repo1 == new TestRepo(false))
+    assert(service.repo2 == service.repo1)
+  }
 
   test("qualifier") {
     import samples2._
@@ -399,6 +415,13 @@ class ConstructorTests extends FunSuite {
     assert(IOC.get[AllBindings[String]](DecoratorModule2, 12, "ab", "ba").values.toList == List("<12>ab", "<12>ba"))
 
     assert(IOC.get[Set[String]](DecoratorModule2, 12, DecoratorModule2aaa) == Set("<12>412", "<12>332", "<12>12"))
+  }
+
+  test("decorated ioc dependency 3") {
+    import samples3._
+
+    val mff = IOC.get[(Int => String) => MyFactory](MyFactoryDec)
+    assert("24" == mff(_.toString).factory(12))
   }
 
 }

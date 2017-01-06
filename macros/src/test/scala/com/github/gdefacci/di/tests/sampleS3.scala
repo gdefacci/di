@@ -97,6 +97,12 @@ object samples3 {
     val c = "412"
   }
 
-  class MyFactory(val factory:Int => String)
+  class MyFactory(val factory: Int => String)
+
+  object MyFactoryDec {
+
+    def decMyFactory(mf: MyFactory) =
+      new MyFactory(((n: Int) => n * 2).andThen(mf.factory))
+  }
   
 }

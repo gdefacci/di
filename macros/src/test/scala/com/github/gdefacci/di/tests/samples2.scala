@@ -77,6 +77,35 @@ object samples2 {
     
   }
   
+  case class Tag[+K,+V](value:V)
+  
+  class WithKey[K] {
+    def apply[V](v:V) = Tag[K,V](v)
+  }
+  object WithKey {
+    def apply[T] = new WithKey[T]
+  }
+  
+  object Id1
+  object Id2
+  
+  object module5TagMulti {
+    
+    def create(r1:Tag[Id1.type,Repository], r2:Tag[Id2.type,Repository]) = ServiceDRepo(r1.value,r2.value)
+
+    val repo1 = WithKey[Id1.type with Id2.type](new TestRepo(false))
+    
+  }
+  
+  object module5Tag {
+    
+    def create(r1:Tag[Id1.type,Repository], r2:Tag[Id2.type,Repository]) = ServiceDRepo(r1.value,r2.value)
+
+    val repo1 = WithKey[Id1.type](new TestRepo(false))
+    val repo2 = WithKey[Id2.type](new TestRepo(true))
+    
+  }
+  
   object module5Bind {
     
     def create(@Named("repo1") r1:Repository, r2:Repository) = ServiceDRepo(r1,r2)
