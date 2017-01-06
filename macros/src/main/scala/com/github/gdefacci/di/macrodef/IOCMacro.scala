@@ -9,7 +9,7 @@ object IOCMacro {
 
     val mappings = ProvidersMap.empty[Id, td.DagNodeOrRef, td.DagNodeDagFactory, td.Ref, c.universe.Type, td.Decorator]
     modules.foreach { module =>
-      mappings ++= td.moduleDagNodeOrRefProviders(module)
+      mappings ++= td.moduleDagNodeOrRef(module)
     }
 
     td.instantiateObjectTree(Global, c.universe.weakTypeOf[T], mappings)
@@ -20,7 +20,7 @@ object IOCMacro {
 
     val mappings = ProvidersMap.empty[Id, dg.td.DagNodeOrRef, dg.td.DagNodeDagFactory, dg.td.Ref, c.universe.Type, dg.td.Decorator]
     modules.foreach { module =>
-      mappings ++= dg.td.moduleDagNodeOrRefProviders(module)
+      mappings ++= dg.td.moduleDagNodeOrRef(module)
     }
 
     c.Expr(dg.graphModel(Global, c.universe.weakTypeOf[T], mappings))
