@@ -18,10 +18,6 @@ final case class TypeValue(owner:TypeOwner, name:String) extends Type
 final case class SingletonTypeValue(owner:TypeOwner, name:String) extends Type
 final case class PolymorphicType(owner:TypeOwner, name:String, typeParams:Seq[Type]) extends Type
 
-sealed trait Tag
-final case class NameTag(name: String) extends Tag
-final case class QualifierTag(qualifierName: String, values: Map[String, Any]) extends Tag
-
 sealed trait ProviderSource
 final case class ConstructorSource(className:String) extends ProviderSource
 final case class MethodSource(owner:String, methodName:String) extends ProviderSource
@@ -41,7 +37,6 @@ object DependencyScope {
 final case class Dependency(
     dependencyId:DependencyId,
     source:ProviderSource,
-    tag:Option[Tag],
     scope:DependencyScope, 
     returnType:Type,
     position:FilePosition, 

@@ -10,13 +10,12 @@ class DagGraph[C <: Context](val context: C) {
 
   import com.github.gdefacci.di.graph
 
-  def graphModel(id: Id,
-    typ: Type,
+  def graphModel(typ: Type,
     mappings: td.Providers[td.DagNodeOrRef]): Tree = {
     
-    val typeResolver = new td.TypeResolver(mappings, MapOfBuffers.empty, mappings.topLevelRefs)
+    val typeResolver = new td.TypeResolver(mappings, collection.mutable.Buffer.empty, mappings.topLevelRefs)
 
-    val dag = typeResolver.resolveRef(td.Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos))
+    val dag = typeResolver.resolveRef(td.Ref(DefaultScope, typ, typ.typeSymbol.pos))
 
     val graphNodes = dag.visit.map(toDependencyTree)
     context.typecheck(q"List(..$graphNodes)")
@@ -55,19 +54,19 @@ class DagGraph[C <: Context](val context: C) {
     }
   }
   
-  private def toGraphTag(id:Id):Tree = id match {
-    case Global | Derived => q"None:Option[com.github.gdefacci.di.graph.Tag]"
-    case WithName(nm) => q"Some(com.github.gdefacci.di.graph.NameTag($nm))"
-    case WithQualifier(nm, values) => 
-      val vs = values.map( e => q"${e._1} -> ${Literal(Constant(e._2))}" )
-      q"Some(com.github.gdefacci.di.graph.QualifierTag($nm, List( ..$vs ).toMap))"
-  }
+//  private def toGraphTag(id:Id):Tree = id match {
+//    case Global | Derived => q"None:Option[com.github.gdefacci.di.graph.Tag]"
+//    case WithName(nm) => q"Some(com.github.gdefacci.di.graph.NameTag($nm))"
+//    case WithQualifier(nm, values) => 
+//      val vs = values.map( e => q"${e._1} -> ${Literal(Constant(e._2))}" )
+//      q"Some(com.github.gdefacci.di.graph.QualifierTag($nm, List( ..$vs ).toMap))"
+//  }
  
   private def toDependencyTree(dag: Dag[td.DagNode]) = {
     val node = dag.value
 
-    val graphScope = node.kind.scope match {
-      case SingletonScope => q"com.github.gdefacci.di.graph.DependencyScope.Singleton"
+    val graphScope = node.scope match {
+      case ApplicationScope => q"com.github.gdefacci.di.graph.DependencyScope.Singleton"
       case DefaultScope => q"com.github.gdefacci.di.graph.DependencyScope.Factory"
     }
     val typ = toGraphType(node.typ)
@@ -83,7 +82,6 @@ class DagGraph[C <: Context](val context: C) {
     com.github.gdefacci.di.graph.Dependency(
         com.github.gdefacci.di.graph.DependencyId(${node.id}), 
         $providerSrc,
-        ${toGraphTag(node.kind.id)},
         $graphScope, 
         $typ, 
         com.github.gdefacci.di.graph.FilePosition(${node.sourcePos.source.file.path}, ${node.sourcePos.line}), 

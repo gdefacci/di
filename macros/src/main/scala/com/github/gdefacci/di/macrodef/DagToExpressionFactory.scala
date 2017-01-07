@@ -24,7 +24,7 @@ trait DagToExpressionFactoryMixin[C <: Context] { self: DagNodes[C] =>
       lazy val toInboundParameters = createConnections(paramsDags.map(_._2.value.id).toSet)
 
       val isParamIndependentSingleton = (expr: Gen.Expression) => {
-        expr.source.value.kind.scope == SingletonScope && !toInboundParameters.isConnected(expr.source)
+        expr.source.value.scope == ApplicationScope && !toInboundParameters.isConnected(expr.source)
       }
 
       return { (dag, deps) =>
@@ -50,7 +50,7 @@ trait DagToExpressionFactoryMixin[C <: Context] { self: DagNodes[C] =>
       lazy val toInboundParameters = createConnections(implementedMethods.flatMap(_.parametersDags.flatMap(_._2.map(_.value.id))).toSet)
 
       val isParamIndependentSingleton = (d: Dag[DagNode]) => {
-        d.value.kind.scope == SingletonScope && !toInboundParameters.isConnected(d)
+        d.value.scope == ApplicationScope && !toInboundParameters.isConnected(d)
       }
 
       val constrParLen = constructorCall.map(_.parametersDags.length).getOrElse(0)

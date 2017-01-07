@@ -114,13 +114,13 @@ class ConstructorTests extends FunSuite {
     assert(service.repository == new SqlRepo(Connection(User("pippo"))))
   }
 
-  test("named") {
-    import samples2._
-
-    val service = IOC.get[ServiceDRepo](samples2.module5)
-    assert(service.repo1 == new TestRepo(false))
-    assert(service.repo2 == new TestRepo(true))
-  }
+//  test("named") {
+//    import samples2._
+//
+//    val service = IOC.get[ServiceDRepo](samples2.module5)
+//    assert(service.repo1 == new TestRepo(false))
+//    assert(service.repo2 == new TestRepo(true))
+//  }
   
   test("type tag") {
     import samples2._
@@ -166,29 +166,29 @@ class ConstructorTests extends FunSuite {
     assert(service.repo2 == new TestRepo(false))
   }
 
-  test("qualifier") {
-    import samples2._
-
-    val service = IOC.get[ServiceDRepo](samples2.module5Qualifier)
-    assert(service.repo1 == new TestRepo(false))
-    assert(service.repo2 == new TestRepo(true))
-  }
-
-  test("named bind") {
-    import samples2._
-
-    val service = IOC.get[ServiceDRepo](samples2.module5Bind)
-    assert(service.repo1 == new TestRepo(true))
-    assert(service.repo2 == new TestRepo(false))
-  }
-
-  test("qualifier bind") {
-    import samples2._
-
-    val service = IOC.get[ServiceDRepo](samples2.module5BindQualifier)
-    assert(service.repo1 == new TestRepo(true))
-    assert(service.repo2 == new TestRepo(false))
-  }
+//  test("qualifier") {
+//    import samples2._
+//
+//    val service = IOC.get[ServiceDRepo](samples2.module5Qualifier)
+//    assert(service.repo1 == new TestRepo(false))
+//    assert(service.repo2 == new TestRepo(true))
+//  }
+//
+//  test("named bind") {
+//    import samples2._
+//
+//    val service = IOC.get[ServiceDRepo](samples2.module5Bind)
+//    assert(service.repo1 == new TestRepo(true))
+//    assert(service.repo2 == new TestRepo(false))
+//  }
+//
+//  test("qualifier bind") {
+//    import samples2._
+//
+//    val service = IOC.get[ServiceDRepo](samples2.module5BindQualifier)
+//    assert(service.repo1 == new TestRepo(true))
+//    assert(service.repo2 == new TestRepo(false))
+//  }
 
   test("singleton") {
 
@@ -229,14 +229,14 @@ class ConstructorTests extends FunSuite {
 
   }
 
-  test("named multi integers") {
-
-    import MultiModule._
-    val (seq1, seq2) = IOC.get[(Seq[Int], Seq[Int])](NMod1, NMod2, NMod3)
-    assert(seq1.toSet == Set(NMod1.i2, NMod2.i2, NMod3.i455))
-    assert(seq2.toSet == Set(NMod1.i1, NMod2.i1))
-
-  }
+//  test("named multi integers") {
+//
+//    import MultiModule._
+//    val (seq1, seq2) = IOC.get[(Seq[Int], Seq[Int])](NMod1, NMod2, NMod3)
+//    assert(seq1.toSet == Set(NMod1.i2, NMod2.i2, NMod3.i455))
+//    assert(seq2.toSet == Set(NMod1.i1, NMod2.i1))
+//
+//  }
 
   test("multi bind") {
 

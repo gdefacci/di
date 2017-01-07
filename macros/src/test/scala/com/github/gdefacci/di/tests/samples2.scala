@@ -1,9 +1,8 @@
 package com.github.gdefacci.di.tests
 
-import javax.inject.{Named, Singleton}
-
 import com.github.gdefacci.di.runtime.Bind
 import com.github.gdefacci.di.runtime.AllBindings
+import com.github.gdefacci.di.runtime.ApplicationScope
 
 object samples2 {
 
@@ -69,15 +68,6 @@ object samples2 {
   
   case class ServiceDRepo(repo1:Repository, repo2:Repository)
   
-  object module5 {
-    
-    def create(@Named("repo1") r1:Repository, r2:Repository) = ServiceDRepo(r1,r2)
-
-    @Named("repo1") val repo1 = new TestRepo(false)
-    val repo2 = new TestRepo(true)
-    
-  }
-  
   case class Tag[+K,+V](value:V)
   
   type ^ [+K,+V] = Tag[K,V]
@@ -141,41 +131,6 @@ object samples2 {
   }
   
   
-  object module5Bind {
-    
-    def create(@Named("repo1") r1:Repository, r2:Repository) = ServiceDRepo(r1,r2)
-
-    @Named("repo1") val bindRepo = Bind[Repository, TestRepo]
-    
-    val mybool = true
-    
-    def repo2(@Named("repo2") b2:Boolean) = new TestRepo(b2)
-    
-    @Named("repo2") val myboolRepo2 = false
-  }
-
-  object module5Qualifier {
-
-    def create(@Qual1(value = 1, name = "aaa") r1:Repository, r2:Repository) = ServiceDRepo(r1,r2)
-
-    @Qual1(value = 1, name = "aaa") val repo1 = new TestRepo(false)
-    val repo2 = new TestRepo(true)
-
-  }
-
-  object module5BindQualifier {
-
-    def create(@Qual1(value = 1, name = "aaa") r1:Repository, r2:Repository) = ServiceDRepo(r1,r2)
-
-    @Named("blah blah") @Named("blah blah 1") @Qual1(value = 1, name = "aaa") val bindRepo = Bind[Repository, TestRepo]
-
-    val mybool = true
-
-    def repo2(@Qual1(value = 2, name = "aaa") b2:Boolean) = new TestRepo(b2)
-
-    @Qual1(value = 2, name = "aaa") val myboolRepo2 = false
-  }
-  
   object module6 {
 
     case class TestRepo(admin: Boolean) extends Repository {
@@ -197,7 +152,7 @@ object samples2 {
   
   object module7 {
     
-    @Singleton
+    @ApplicationScope
     val bindRepo = Bind[Repository, MyRepo]
     
   }
@@ -211,7 +166,7 @@ object samples2 {
     val b = true
     val gitm = new GItm
     
-    @Singleton
+    @ApplicationScope
     def createGCl[T](v:T):GCl[T] = new GCl[T](v)
     
   }

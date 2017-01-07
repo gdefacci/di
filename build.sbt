@@ -12,7 +12,6 @@ lazy val scalaReflect = Def.setting { "org.scala-lang" % "scala-reflect" % scala
 lazy val macros = Project("macros", file("macros"))
   .settings(Defaults.coreDefaultSettings ++ Seq(
     libraryDependencies += scalaReflect.value,
-    libraryDependencies += "com.github.jsr-330" % "core" % "1.4.0",
     libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" 
   )).dependsOn(runtime)
 

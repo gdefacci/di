@@ -9,7 +9,7 @@ trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with Da
   private class ExprAlias(module: context.Tree, val typ: Type, val parent: Option[Dag[DagNodeOrRef]]) {
     def this(module: context.Tree, parent: Option[Dag[DagNodeOrRef]]) = this(module, module.tpe, parent)
     val termName = TermName(context.freshName(typ.typeSymbol.name.decodedName.toString))
-    val dag = alias(termName, module, typ, Kind(Global, SingletonScope), parent)
+    val dag = alias(termName, module, typ, ApplicationScope, parent)
   }
   
   class ModuleDagNodeOrRef(membersSelect: MembersSelect[context.type]) {
@@ -31,16 +31,13 @@ trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with Da
       val exprNm = exprAlias.termName
       val exprDag = exprAlias.dag
 
-      val acc = ProvidersMap.empty[Id, DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator]
+      val acc = ProvidersMap.empty[DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator]
 
       membersSelect.getBindings(exprAlias.typ).foreach {
         case membersSelect.MethodBinding(member) =>
 
-          val dgs = methodDag(exprDag, exprNm, member).toSeq.flatMap {
-            case dg @ Dag(dn: DagNode, _) => (dn.kind.id -> dg) :: Nil
-            case _ => Nil
-          }
-          acc.membersMap ++= dgs
+          val dg = methodDag(exprDag, exprNm, member)
+          acc.members += dg
 
         case membersSelect.DecoratorBinding(member, selfIndex) =>
 
@@ -50,25 +47,20 @@ trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with Da
           }
 
           val dec = Decorator(inpDags :+ exprDag, exprNm, member, selfIndex)
-          val knds = kindProvider(member)
+          val scope = scopeProvider(member)
 
-          knds.ids.toList match {
-            case Nil => ()
-            case Global :: Nil => ()
-            case _ => context.abort(member.pos, "decorators cant be named / qualified")
-          }
-          if (knds.scope != DefaultScope) context.abort(member.pos, "decorators cant have scope annotation")
+          if (scope != DefaultScope) context.abort(member.pos, "decorators cant have scope annotation")
 
           acc.decoratorsBuffer += (member.returnType -> dec)
 
         case membersSelect.BindInstance(member, abstractType, concreteType) =>
 
-          val knds = kindProvider(member)
-          val refs = knds.ids.toSeq.map(id => Ref(Kind(id, knds.scope), concreteType, member.pos))
+          val scope = scopeProvider(member)
+          val ref = Ref(scope, concreteType, member.pos)
 
-          acc.membersMap ++= (refs.map(r => (r.kind.id -> Dag(r))))
+          acc.members += Dag(ref) 
           if (abstractType == concreteType) {
-            acc.topLevelRefsSet ++= refs
+            acc.topLevelRefsSet += ref
           }
 
         case membersSelect.ModuleContainerBinding(member, typ) =>
@@ -81,21 +73,21 @@ trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with Da
 
           val typ = moduleSymbol.asModule.moduleClass.asType.toType
           val memAlias = new ExprAlias(q"${exprAlias.termName}.${moduleSymbol.name}", typ, Some(exprAlias.dag))
-          acc.membersMap += (memAlias.dag.value.kind.id, memAlias.dag)
+          acc.members += memAlias.dag
 
         case membersSelect.PolyMethodBinding(member, polyType) =>
 
-          val knds = kindProvider(member)
-          acc.polyMembersMap ++= (knds.ids.toSeq.map(id => id -> new PolyDagNodeFactory(Kind(id, knds.scope), Some(exprNm -> exprDag), member, polyType)))
+          val knds = scopeProvider(member)
+          acc.polyMembers += new PolyDagNodeFactory(knds, Some(exprNm -> exprDag), member, polyType)
       }
 
-      acc.membersMap += (exprDag.value.kind.id, exprDag)
+      acc.members += exprDag
 
       acc
     }
 
     private def moduleContainerDagNodeOrRefProviders(moduleContainerAlias: ExprAlias): Providers[DagNodeOrRef] = {
-      val mappings = ProvidersMap.empty[Id, DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator]
+      val mappings = ProvidersMap.empty[DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator]
       membersSelect.getValues(moduleContainerAlias.typ).map { member =>
         val typ = if (member.isModule) member.asModule.moduleClass.asType.toType
         else if (member.isMethod) member.asMethod.returnType

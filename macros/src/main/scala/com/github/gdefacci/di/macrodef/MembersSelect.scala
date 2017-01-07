@@ -33,16 +33,13 @@ private[di] class MembersSelect[C <: Context](val context: C) {
   private def isAbstractMethod = (member: Symbol) =>
     member.isMethod && member.isAbstract
 
-  def getPolyType(m: MethodSymbol): Option[PolyType] = m.info match {
-    case t @ PolyType(_, _) => Some(t)
-    case _                  => None
-  }
+  def getPolyType(m: MethodSymbol): Option[PolyType] = getPolyType(m.info)
 
   def getPolyType(m: Type): Option[PolyType] = m match {
     case t @ PolyType(_, _) => Some(t)
     case _                  => None
   }
-
+  
   private val modulesContainerType = typeOf[ModulesContainer]
 
   def isModuleContainerInstance(t: Type) = t <:< modulesContainerType

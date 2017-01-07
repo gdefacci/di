@@ -10,12 +10,11 @@ private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with
 
   val moduleDagNodeOrRef = new ModuleDagNodeOrRef(this.membersSelect)
   
-  def instantiateObjectTree[T](id: Id,
-    typ: Type,
+  def instantiateObjectTree[T](typ: Type,
     mappings: Providers[DagNodeOrRef]): Tree = {
 
-    val ref = Ref(Kind(id, DefaultScope), typ, typ.typeSymbol.pos)
-    val typeResolver = new TypeResolver(mappings, MapOfBuffers.empty, mappings.topLevelRefs + ref)
+    val ref = Ref(DefaultScope, typ, typ.typeSymbol.pos)
+    val typeResolver = new TypeResolver(mappings, collection.mutable.Buffer.empty, mappings.topLevelRefs + ref)
 
     val dag = typeResolver.resolveRef(ref)
     

@@ -6,18 +6,18 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
 
   import context.universe._
 
-  def alias(exprNm:TermName, valueExpr: Tree, tpe:Type, kind:Kind, parent:Option[Dag[DagNodeOrRef]]):Dag[DagNodeOrRef] = {
+  def alias(exprNm:TermName, valueExpr: Tree, tpe:Type, scope:DagScope, parent:Option[Dag[DagNodeOrRef]]):Dag[DagNodeOrRef] = {
     val vexpr = q"""
     val $exprNm = $valueExpr
     """
     parent.map { par =>
-      Dag(DagNode.value(kind, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)), par :: Nil)
+      Dag(DagNode.value(scope, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)), par :: Nil)
     }.getOrElse {
-      Dag(DagNode.value(kind, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)))
+      Dag(DagNode.value(scope, q"$exprNm", tpe, valueExpr.pos, DagToExpression(exprNm, valueExpr)))
     }
   }
   
-  def outboundParameterDag(knd:Kind, par:Symbol):Ref = {
+  def outboundParameterDag(scope:DagScope, par:Symbol):Ref = {
     val parTyp = par.info match {
       case TypeRef(pre, k, args) if k == definitions.ByNameParamClass => 
         assert(args.length==1)
@@ -25,16 +25,16 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
       case _ => par.info
     }
     
-    Ref(knd, parTyp, par.pos)
+    Ref(scope, parTyp, par.pos)
   }
 
   private def paramListsRefs(paramLists:List[List[Symbol]]):List[Ref] = 
     paramLists.flatMap(pars => pars.map { par =>
-      val knd = kindProvider(par)
-      if (knd.ids.size > 1) {
-        context.abort(par.pos, "parameters must have at most one identifier annotation")
+      val scope = scopeProvider(par)
+      if (scope != DefaultScope) {
+        context.abort(par.pos, "parameters can have scope annotation")
       }
-      outboundParameterDag(Kind(knd.ids.head, knd.scope), par)
+      outboundParameterDag(scope, par)
     })
   
   def paramListsDags(paramLists:List[List[Symbol]]) =
@@ -42,15 +42,15 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     
   def methodDag(container: Dag[DagNodeOrRef],
                 containerTermName: TermName,
-                method: Symbol): Set[Dag[DagNodeOrRef]] = {
+                method: Symbol): Dag[DagNodeOrRef] = {
     val paramLists = method.asMethod.paramLists
     val parametersDags: Seq[Dag[DagNodeOrRef]] = paramListsDags(paramLists)
     assert(paramLists.map(_.length).sum == parametersDags.length)
-    val knds = kindProvider(method)
-    knds.ids.map( id => Dag(DagNode.methodCall(Kind(id, knds.scope), Some(containerTermName), method), parametersDags.toSeq :+ container))
+    val scope = scopeProvider(method)
+    Dag(DagNode.methodCall(scope, Some(containerTermName), method), parametersDags.toSeq :+ container)
   }
   
-  def constructorDag(knd:Kind,
+  def constructorDag(scope:DagScope,
                      exprType:Type,
                      constructorMethod:MethodSymbol,
                      members:Seq[Tree]): Dag[DagNodeOrRef] = {
@@ -60,7 +60,7 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     }
     val parametersDags: Seq[Dag[DagNodeOrRef]] = paramListsDags(constructorMethod.paramLists)
     assert(parametersDags.length == constructorMethod.paramLists.map(_.length).sum)
-    Dag(DagNode.constructorCall(knd, exprType, constructorMethod, members), parametersDags)
+    Dag(DagNode.constructorCall(scope, exprType, constructorMethod, members), parametersDags)
   }
 
   

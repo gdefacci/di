@@ -8,7 +8,7 @@ private[di] trait DagNodes[C <: Context] {
   import context.universe._
 
   val reflectUtils = new ReflectUtils[context.type](context)
-  val kindProvider = new DefaultKindProvider[context.type](context)
+  val scopeProvider = new DagScopeProvider[context.type](context)
 
   object IdGen {
     private var counter = 0
@@ -19,14 +19,14 @@ private[di] trait DagNodes[C <: Context] {
   }
 
   sealed trait DagNodeOrRef {
-    def kind: Kind
+    def scope: DagScope
     def typ: Type
     def sourcePos: Position
     def description: String
     override def toString = description
   }
 
-  sealed case class Ref(val kind: Kind, val typ: Type, val sourcePos: Position) extends DagNodeOrRef {
+  sealed case class Ref(val scope: DagScope, val typ: Type, val sourcePos: Position) extends DagNodeOrRef {
     assert(typ != null)
     def description: String = s"Reference to type $typ"
   }
@@ -73,7 +73,7 @@ private[di] trait DagNodes[C <: Context] {
     }
 
     def singletonize(e: Gen.Expression): Gen.Expression = {
-      if (e.source.value.kind.scope != SingletonScope) e
+      if (e.source.value.scope != ApplicationScope) e
       else {
         val singletonName = TermName(context.freshName("singleton" + e.source.value.name))
         e match {
@@ -82,7 +82,7 @@ private[di] trait DagNodes[C <: Context] {
           case v: Gen.Block =>
             val v1 = v.source.value
             val newSource =
-              DagNode(v1.providerSource, v1.kind, v1.description, v1.name, v1.typ, v1.sourcePos, DagToExpression.const(q""))
+              DagNode(v1.providerSource, v1.scope, v1.description, v1.name, v1.typ, v1.sourcePos, DagToExpression.const(q""))
 
             new Gen.Block(v.source, v.declarations :+ new Gen.Declaration(singletonName, new Gen.Value(Dag(newSource, e.source.inputs), v.value)), q"$singletonName")
         }
@@ -113,7 +113,7 @@ private[di] trait DagNodes[C <: Context] {
 
     private final class DagNodeImpl private[DagNode] (
         val providerSource:ProviderSource,
-        val kind: Kind,
+        val scope: DagScope,
         val name: String,
         val description: String,
         val typ: Type,
@@ -126,28 +126,28 @@ private[di] trait DagNodes[C <: Context] {
 
     def apply(
       providerSource: ProviderSource,
-      kind: Kind,
+      scope: DagScope,
       name: String,
       description: String,
       typ: Type,
       sourcePos: Position,
-      dagToExpression: DagToExpression): DagNode = new DagNodeImpl(providerSource, kind, name, description, typ, sourcePos, dagToExpression)
+      dagToExpression: DagToExpression): DagNode = new DagNodeImpl(providerSource, scope, name, description, typ, sourcePos, dagToExpression)
 
-    def value(kind: Kind, value: Tree, typ: Type, sourcePos: Position, dagToExpression: DagToExpression):DagNode =
-      apply(ProviderSource.ValueSource, kind, s"$value", s"$value", typ, sourcePos, dagToExpression)
+    def value(scope: DagScope, value: Tree, typ: Type, sourcePos: Position, dagToExpression: DagToExpression):DagNode =
+      apply(ProviderSource.ValueSource, scope, s"$value", s"$value", typ, sourcePos, dagToExpression)
 
-    def methodCall(kind: Kind, containerTermName: Option[TermName], method: Symbol):DagNode = {
+    def methodCall(scope: DagScope, containerTermName: Option[TermName], method: Symbol):DagNode = {
       val methodSymbol = method.asMethod
       val providerSource = new ProviderSource.MethodSource(method.asMethod)
       val mthdName = method.name.decodedName.toString
       val description = s"${method.owner.name}.${method.name}"
-      apply(providerSource, kind, mthdName, description,
+      apply(providerSource, scope, mthdName, description,
         typ = methodSymbol.returnType,
         sourcePos = method.pos,
         DagToExpression.apply(inputs => reflectUtils.methodCall(containerTermName, methodSymbol, inputs)))
     }
 
-    def constructorCall(kind: Kind, typ: Type, constructor: MethodSymbol, members: Seq[Tree]): DagNode = {
+    def constructorCall(scope: DagScope, typ: Type, constructor: MethodSymbol, members: Seq[Tree]): DagNode = {
       val invoker: Seq[Tree] => Tree = if (members.isEmpty) { inputs =>
         reflectUtils.methodCall(None, constructor, inputs)
       } else { inputs =>
@@ -155,22 +155,22 @@ private[di] trait DagNodes[C <: Context] {
       }
       val providerSource = new ProviderSource.ConstructorSource(constructor)
       val typName = typ.typeSymbol.name.decodedName.toString
-      apply(providerSource, kind, typName, s"$constructor", typ, constructor.pos,
+      apply(providerSource, scope, typName, s"$constructor", typ, constructor.pos,
         DagToExpression(invoker))
     }
 
   }
 
-  type Providers[T] = ProvidersMap[Id, T, DagNodeDagFactory, Ref, Type, Decorator]
+  type Providers[T] = ProvidersMap[T, DagNodeDagFactory, Ref, Type, Decorator]
 
   trait DagNodeDagFactory {
 
-    def kind: Kind
+    def scope: DagScope
     def apply(typ: Type): Option[Dag[DagNodeOrRef]]
 
   }
 
-  class PolyDagNodeFactory(val kind: Kind, containerInfos: Option[(TermName, Dag[DagNodeOrRef])], method: MethodSymbol, polyType: PolyType) extends DagNodeDagFactory {
+  class PolyDagNodeFactory(val scope: DagScope, containerInfos: Option[(TermName, Dag[DagNodeOrRef])], method: MethodSymbol, polyType: PolyType) extends DagNodeDagFactory {
 
     val (typeArgs, underlying) = method.returnType match {
       case TypeRef(NoPrefix, underlying, args) => args -> underlying
@@ -214,15 +214,12 @@ private[di] trait DagNodes[C <: Context] {
             tp.asType.toType.substituteTypes(tpKeys, tpVals)
           }
           val dagInputs = method.paramLists.flatMap(pars => pars.map { par =>
-            val parKnd = kindProvider(par)
-            if (parKnd.ids.size > 1) {
-              context.abort(par.pos, "parameters must have at most one identifier annotation")
-            }
-            if (parKnd.scope != DefaultScope) {
+            val scope = scopeProvider(par)
+            if (scope != DefaultScope) {
               context.abort(par.pos, "parameters cant have scope annotations")
             }
             val parTyp = par.info.substituteTypes(tpKeys, tpVals)
-            Dag[DagNodeOrRef](Ref(Kind(parKnd.ids.head, parKnd.scope), parTyp, par.pos))
+            Dag[DagNodeOrRef](Ref(scope, parTyp, par.pos))
           })
 
           val mRetType = polyType.resultType.substituteTypes(tpKeys, tpVals)
@@ -232,7 +229,7 @@ private[di] trait DagNodes[C <: Context] {
           val invoker: Seq[Tree] => Tree = { args => reflectUtils.methodCall(containerInfos.map(_._1), method, substTypes, args) }
 
           val nd =
-            DagNode(providerSource, kind, method.name.toString, description,
+            DagNode(providerSource, scope, method.name.toString, description,
               concreteType,
               method.pos,
               DagToExpression(invoker))

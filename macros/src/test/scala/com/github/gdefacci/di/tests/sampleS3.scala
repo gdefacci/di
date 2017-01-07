@@ -1,8 +1,8 @@
 package com.github.gdefacci.di.tests
 
-import javax.inject.Singleton
 import com.github.gdefacci.di.runtime.Bind
 import com.github.gdefacci.di.runtime.AllBindings
+import com.github.gdefacci.di.runtime.ApplicationScope
 
 object samples3 {
 
@@ -40,7 +40,7 @@ object samples3 {
   object ModuleCred {
     val credFactoryBind = Bind.bind[CredFactory]
 
-    @Singleton def createPers(name: String) = new Pers(name, 33)
+    @ApplicationScope def createPers(name: String) = new Pers(name, 33)
 
     val name = "Roy"
   }
@@ -58,7 +58,7 @@ object samples3 {
 
   object ModuleServ1 {
 
-    @Singleton val bindServ2 = Bind.bind[Serv2]
+    @ApplicationScope val bindServ2 = Bind.bind[Serv2]
 
   }
 
