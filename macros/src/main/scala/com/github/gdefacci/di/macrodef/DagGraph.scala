@@ -6,16 +6,18 @@ class DagGraph[C <: Context](val context: C) {
 
   import context.universe._
 
-  val td = new TypeDag[context.type](context)
+  val typeDag = new TypeDag[context.type](context)
 
   import com.github.gdefacci.di.graph
 
   def graphModel(typ: Type,
-    mappings: td.Providers[td.DagNodeOrRef]): Tree = {
+    mappings: typeDag.Providers[typeDag.DagNodeOrRef]): Tree = {
     
-    val typeResolver = new td.TypeResolver(mappings, collection.mutable.Buffer.empty, mappings.topLevelRefs)
+    val membersSelect = new MembersSelect[context.type](context)
+    
+    val typeResolver = new typeDag.TypeResolver(membersSelect, mappings, collection.mutable.Buffer.empty, mappings.topLevelRefs)
 
-    val dag = typeResolver.resolveRef(td.Ref(DefaultScope, typ, typ.typeSymbol.pos))
+    val dag = typeResolver.resolveRef(typeDag.Ref(DefaultScope, typ, typ.typeSymbol.pos))
 
     val graphNodes = dag.visit.map(toDependencyTree)
     context.typecheck(q"List(..$graphNodes)")
@@ -54,15 +56,7 @@ class DagGraph[C <: Context](val context: C) {
     }
   }
   
-//  private def toGraphTag(id:Id):Tree = id match {
-//    case Global | Derived => q"None:Option[com.github.gdefacci.di.graph.Tag]"
-//    case WithName(nm) => q"Some(com.github.gdefacci.di.graph.NameTag($nm))"
-//    case WithQualifier(nm, values) => 
-//      val vs = values.map( e => q"${e._1} -> ${Literal(Constant(e._2))}" )
-//      q"Some(com.github.gdefacci.di.graph.QualifierTag($nm, List( ..$vs ).toMap))"
-//  }
- 
-  private def toDependencyTree(dag: Dag[td.DagNode]) = {
+  private def toDependencyTree(dag: Dag[typeDag.DagNode]) = {
     val node = dag.value
 
     val graphScope = node.scope match {
@@ -72,9 +66,9 @@ class DagGraph[C <: Context](val context: C) {
     val typ = toGraphType(node.typ)
 
     val providerSrc = dag.value.providerSource match {
-      case td.ProviderSource.MethodSource(m) => q"com.github.gdefacci.di.graph.MethodSource(${m.owner.fullName}, ${m.name.decodedName.toString})"
-      case td.ProviderSource.DecoratorSource(m) => q"com.github.gdefacci.di.graph.DecoratorSource(${m.owner.fullName}, ${m.name.decodedName.toString})"
-      case td.ProviderSource.ConstructorSource(c) => q"com.github.gdefacci.di.graph.ConstructorSource(${c.owner.fullName})"
+      case typeDag.ProviderSource.MethodSource(m) => q"com.github.gdefacci.di.graph.MethodSource(${m.owner.fullName}, ${m.name.decodedName.toString})"
+      case typeDag.ProviderSource.DecoratorSource(m) => q"com.github.gdefacci.di.graph.DecoratorSource(${m.owner.fullName}, ${m.name.decodedName.toString})"
+      case typeDag.ProviderSource.ConstructorSource(c) => q"com.github.gdefacci.di.graph.ConstructorSource(${c.owner.fullName})"
       case _ => q"com.github.gdefacci.di.graph.ValueSource"
     }
 

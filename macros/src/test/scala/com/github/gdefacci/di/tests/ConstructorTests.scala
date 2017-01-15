@@ -114,18 +114,10 @@ class ConstructorTests extends FunSuite {
     assert(service.repository == new SqlRepo(Connection(User("pippo"))))
   }
 
-//  test("named") {
-//    import samples2._
-//
-//    val service = IOC.get[ServiceDRepo](samples2.module5)
-//    assert(service.repo1 == new TestRepo(false))
-//    assert(service.repo2 == new TestRepo(true))
-//  }
-  
   test("type tag") {
     import samples2._
 
-    val service = IOC.get[ServiceDRepo](samples2.module5Tag)
+    val service = IOC.get[ServiceDRepo](tagSamples.module5Tag)
     assert(service.repo1 == new TestRepo(false))
     assert(service.repo2 == new TestRepo(true))
   }
@@ -133,7 +125,7 @@ class ConstructorTests extends FunSuite {
   test("type tag single source") {
     import samples2._
 
-    val service = IOC.get[ServiceDRepo](samples2.module5TagSingleSource)
+    val service = IOC.get[ServiceDRepo](tagSamples.module5TagSingleSource)
     assert(service.repo1 == new TestRepo(false))
     assert(service.repo2 == service.repo1)
   }
@@ -141,7 +133,7 @@ class ConstructorTests extends FunSuite {
   test("type tag multi") {
     import samples2._
 
-    val repos = IOC.get[Seq[Repository]](samples2.module5TagAndMulti)
+    val repos = IOC.get[Seq[Repository]](tagSamples.module5TagAndMulti)
     assert(repos.length == 2)
     assert(repos.exists( _ == new TestRepo(true)))
     assert(repos.exists( _ == new TestRepo(false)))
@@ -151,7 +143,7 @@ class ConstructorTests extends FunSuite {
   test("type tag multi match all") {
     import samples2._
 
-    val repos = IOC.get[Seq[Repository]](samples2.module5TagAndMultiMatchAll)
+    val repos = IOC.get[Seq[Repository]](tagSamples.module5TagAndMultiMatchAll)
     assert(repos.length == 2)
     assert(repos.exists( _ == new TestRepo(true)))
     assert(repos.exists( _ == new TestRepo(false)))
@@ -161,34 +153,38 @@ class ConstructorTests extends FunSuite {
   test("type tag single bind") {
     import samples2._
 
-    val service = IOC.get[ServiceDRepo](samples2.module5TagBindTag)
+    val service = IOC.get[ServiceDRepo](tagSamples.module5TagBindTag)
+    assert(service.repo1 == new TestRepo(false))
+    assert(service.repo2 == new TestRepo(false))
+  }
+  
+  test("unboxed type tag") {
+    import samples2._
+
+    val service = IOC.get[ServiceDRepo](unboxedTagSamples.module5Tag)
+    assert(service.repo1 == new TestRepo(false))
+    assert(service.repo2 == new TestRepo(true))
+  }
+  
+
+  test("unboxed type tag multi") {
+    import samples2._
+
+    val repos = IOC.get[Seq[Repository]](unboxedTagSamples.module5TagAndMulti)
+    assert(repos.length == 2)
+    assert(repos.exists( _ == new TestRepo(true)))
+    assert(repos.exists( _ == new TestRepo(false)))
+    
+  }
+    
+  test("unboxed type tag single bind") {
+    import samples2._
+
+    val service = IOC.get[ServiceDRepo](unboxedTagSamples.module5TagBindTag)
     assert(service.repo1 == new TestRepo(false))
     assert(service.repo2 == new TestRepo(false))
   }
 
-//  test("qualifier") {
-//    import samples2._
-//
-//    val service = IOC.get[ServiceDRepo](samples2.module5Qualifier)
-//    assert(service.repo1 == new TestRepo(false))
-//    assert(service.repo2 == new TestRepo(true))
-//  }
-//
-//  test("named bind") {
-//    import samples2._
-//
-//    val service = IOC.get[ServiceDRepo](samples2.module5Bind)
-//    assert(service.repo1 == new TestRepo(true))
-//    assert(service.repo2 == new TestRepo(false))
-//  }
-//
-//  test("qualifier bind") {
-//    import samples2._
-//
-//    val service = IOC.get[ServiceDRepo](samples2.module5BindQualifier)
-//    assert(service.repo1 == new TestRepo(true))
-//    assert(service.repo2 == new TestRepo(false))
-//  }
 
   test("singleton") {
 
@@ -228,15 +224,6 @@ class ConstructorTests extends FunSuite {
     assert(IOC.get[Seq[Int]](ModBag).toSet == Set(Mod1.i1, Mod1.i2, Mod2.i3, Mod3.i455))
 
   }
-
-//  test("named multi integers") {
-//
-//    import MultiModule._
-//    val (seq1, seq2) = IOC.get[(Seq[Int], Seq[Int])](NMod1, NMod2, NMod3)
-//    assert(seq1.toSet == Set(NMod1.i2, NMod2.i2, NMod3.i455))
-//    assert(seq2.toSet == Set(NMod1.i1, NMod2.i1))
-//
-//  }
 
   test("multi bind") {
 

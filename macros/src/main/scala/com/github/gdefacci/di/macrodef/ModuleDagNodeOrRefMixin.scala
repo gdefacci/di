@@ -12,6 +12,8 @@ trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with Da
     val dag = alias(termName, module, typ, ApplicationScope, parent)
   }
   
+  def emptyProviders = ProvidersMap.empty[DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator]
+  
   class ModuleDagNodeOrRef(membersSelect: MembersSelect[context.type]) {
 
     def apply(module: context.Expr[_]): Providers[DagNodeOrRef] = {
@@ -31,7 +33,7 @@ trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with Da
       val exprNm = exprAlias.termName
       val exprDag = exprAlias.dag
 
-      val acc = ProvidersMap.empty[DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator]
+      val acc = emptyProviders
 
       membersSelect.getBindings(exprAlias.typ).foreach {
         case membersSelect.MethodBinding(member) =>

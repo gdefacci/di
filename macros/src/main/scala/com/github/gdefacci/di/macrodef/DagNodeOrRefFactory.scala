@@ -63,5 +63,4 @@ private[di] trait DagNodeOrRefFactory[C <: Context] { self:DagNodes[C] =>
     Dag(DagNode.constructorCall(scope, exprType, constructorMethod, members), parametersDags)
   }
 
-  
 }

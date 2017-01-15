@@ -6,13 +6,13 @@ private[di] class IsPrimitive[C <: Context](val context:C) {
   
   import context.universe._
   
-  val TInt = typeOf[Int]
-  val TByte = typeOf[Byte]
-  val TShort = typeOf[Short]
-  val TBoolean = typeOf[Boolean]
-  val TDouble = typeOf[Double]
-  val TFloat = typeOf[Float]
-  val TString = typeOf[String]
+  private val TInt = typeOf[Int]
+  private val TByte = typeOf[Byte]
+  private val TShort = typeOf[Short]
+  private val TBoolean = typeOf[Boolean]
+  private val TDouble = typeOf[Double]
+  private val TFloat = typeOf[Float]
+  private val TString = typeOf[String]
   
   def apply(typ:Type):Boolean = {
     typ match {

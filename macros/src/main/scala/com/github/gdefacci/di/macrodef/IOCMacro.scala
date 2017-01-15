@@ -5,9 +5,11 @@ import scala.reflect.macros.blackbox.Context
 object IOCMacro {
 
   def get[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Tree = {
+    
     val td = new TypeDag[c.type](c)
 
-    val mappings = ProvidersMap.empty[td.DagNodeOrRef, td.DagNodeDagFactory, td.Ref, c.universe.Type, td.Decorator]
+    val mappings = td.emptyProviders
+    
     modules.foreach { module =>
       mappings ++= td.moduleDagNodeOrRef(module)
     }
@@ -17,10 +19,9 @@ object IOCMacro {
 
   def graph[T: c.WeakTypeTag](c: Context)(modules: c.Expr[Any]*): c.Expr[T] = {
     val dg = new DagGraph[c.type](c)
-
-    val mappings = ProvidersMap.empty[dg.td.DagNodeOrRef, dg.td.DagNodeDagFactory, dg.td.Ref, c.universe.Type, dg.td.Decorator]
+    val mappings = dg.typeDag.emptyProviders
     modules.foreach { module =>
-      mappings ++= dg.td.moduleDagNodeOrRef(module)
+      mappings ++= dg.typeDag.moduleDagNodeOrRef(module)
     }
 
     c.Expr(dg.graphModel(c.universe.weakTypeOf[T], mappings))
