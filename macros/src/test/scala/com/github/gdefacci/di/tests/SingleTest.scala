@@ -6,10 +6,16 @@ import com.github.gdefacci.di.runtime.AllBindings
 
 object SingleTest extends App {
   
-    import samples3._
-
-    val mff = IOC.get[(Int => String) => MyFactory]()
+    import tagSamples._
     
-    assert("12" == mff( _.toString).factory(12))
+    val lst = IOC.get[Option[String]](tagSamples.moduleH)
+    
+    println(lst)
+    println(IOC.getSource[Option[String]](tagSamples.moduleH))
+    println(IOC.getSource[List[String]](tagSamples.moduleH))
+//    println( IOC.getSource[List[String]](tagSamples.module5TagDecoratorPolyTypeBounds) )
+    
+//    println(lst.head)
+//    println(lst.tail.head)
     
 }

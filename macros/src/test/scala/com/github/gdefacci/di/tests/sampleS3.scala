@@ -105,4 +105,16 @@ object samples3 {
       new MyFactory(((n: Int) => n * 2).andThen(mf.factory))
   }
   
+  object InvalidPolimorphicMethod {
+    
+    def polyWrong[A,B](a:A, b:B):Map[String,A] = Map.empty
+ 
+    def a = "aaa"
+    def b = 12
+  }
+ 
+  object ToDel {
+    
+    def a = "aaa"
+  }
 }

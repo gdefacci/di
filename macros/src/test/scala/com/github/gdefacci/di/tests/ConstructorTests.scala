@@ -270,6 +270,16 @@ class ConstructorTests extends FunSuite {
     assert(Pippo("Pippy", 27) == p2)
 
   }
+  
+  test("polymorphic provider1") {
+    import samples1._
+
+    val p1 = IOC.get[Map[String,List[Int]]](ModPolymorphic1)
+
+    assert(p1.get("key") == Some(List(4)))
+
+
+  }
 
   test("polymorphic factory") {
     import samples1._
@@ -438,5 +448,42 @@ class ConstructorTests extends FunSuite {
     val mff = IOC.get[(Int => String) => MyFactory](MyFactoryDec)
     assert("24" == mff(_.toString).factory(12))
   }
+  
+  test("decorate type tag") {
+    
+    val str = IOC.get[String](tagSamples.module5TagDecorator)
+    
+    assert("input 1" == str)
+  }
+  
+  test("decorate type tag poly value") {
+    
+    val str = IOC.get[String](tagSamples.module5TagDecoratorPoly)
+    
+    assert("input 1" == str)
+  }
+  
+  test("decorate type tag polymorphic key") {
+    
+    val strs = IOC.get[List[String]](tagSamples.module5TagDecoratorPolyK).toSet
+    
+    assert(strs.contains("aaa 1"))
+    assert(strs.contains("bbb 1"))
+  }
+  
+  test("decorate type tag polymorphic type bounds") {
+    
+    import tagSamples._
+    
+    val lst = IOC.get[List[String]](tagSamples.module5TagDecoratorPolyTypeBounds)
+    
+    assert("aaa 0" == lst.head)
+    assert("bbb 1" == lst.tail.head)
+  }
 
+  test("higher kind") {
+    assert( IOC.get[Option[String]](tagSamples.moduleH) == Some("2") )
+    assert( IOC.get[List[String]](tagSamples.moduleH) == List("2", "4", "8") )
+  }
+  
 }

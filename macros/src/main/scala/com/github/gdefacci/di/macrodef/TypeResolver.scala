@@ -2,7 +2,7 @@ package com.github.gdefacci.di.macrodef
 
 import scala.reflect.macros.blackbox
 
-trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeOrRefFactory[C] with DagToExpressionFactoryMixin[C] =>
+trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeOrRefFactory[C] with DagToExpressionFactoryMixin[C] with Unifier[C] with ProvidersMixin[C] =>
 
   import DagToExpressionFactory.{ ConstructorCall, ImplementedMethod }
 
@@ -56,17 +56,37 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     }
 
     def decorate(res: Dag[DagNode]) = {
-      val decs = mappings.getDecorators(res.value.typ weak_<:< _)
-      if (decs.size > 1) error("found more than a decorator for type " + res.value.typ)
+      val typ = res.value.typ
+      val decs = mappings.getDecorators(typ weak_<:< _)
+      if (decs.size > 1) error("found more than a decorator for type " + typ)
       else {
         decs.headOption.map { dec =>
           Dag(DagNode(ProviderSource.DecoratorSource(dec.method), res.value.scope, res.value.name + "Decorator", res.value.description + "Decorator",
-            res.value.typ, res.value.sourcePos, DagToExpressionFactory.decorator(dec.containerTermName, dec.method, dec.selfIndex)),
+            typ, res.value.sourcePos, DagToExpressionFactory.decorator(dec.containerTermName, dec.method, dec.selfIndex)),
             res :: dec.inputs.map { dg =>
               resolveDagNodeOrRef(dg.value, dg.inputs)
             }.toList)
         }.getOrElse {
-          res
+          val polyDecorators = mappings.findPolymorphicDecorators{ df =>
+            df.polyDagNodeFactory.apply(typ).map(df -> _)
+          }
+          polyDecorators match {
+            case Seq() => res
+            case Seq((dec, dag)) =>
+
+              val mthd = dec.polyDagNodeFactory.method
+              Dag(
+                DagNode(ProviderSource.DecoratorSource(dec.polyDagNodeFactory.method),
+                  res.value.scope,
+                  res.value.name + "Decorator",
+                  res.value.description + "Decorator",
+                  typ,
+                  res.value.sourcePos,
+                  DagToExpressionFactory.decorator(dec.containerTermName, mthd, dec.selfIndex)),
+                res :: resolveDagNodeOrRef(dag.value, dag.inputs) :: Nil)
+            case _ => 
+              error(s"found more than a polymorphic factory for $typ")
+          }
         }
       }
     }
@@ -107,12 +127,15 @@ trait TypeResolverMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeO
     private def resolveTargetRef(ref: Ref): Dag[DagNode] = {
       val Ref(_, typ, pos) = ref
       val typMappings = mappings.findMembers { nd => nd != ref && nd.typ <:< typ }
+      
       typMappings match {
         case Seq() =>
           val polyMembers = mappings.findPolymorphicMembers(df => df.apply(typ))
           polyMembers match {
             case Seq() => instantiateRef(ref)
-            case Seq(dag) => resolveDagNodeOrRef(dag.value, dag.inputs)
+            case Seq(dag) => {
+              resolveDagNodeOrRef(dag.value, dag.inputs)
+            }
             case _ => error(s"found more than a polymorphic factory for $typ")
           }
 

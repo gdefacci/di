@@ -44,24 +44,20 @@ private[di] class MembersSelect[C <: Context](val context: C) {
 
   def isModuleContainerInstance(t: Type) = t <:< modulesContainerType
 
-  object DecoratorSelfExtract {
-    def unapply(s: Symbol): Option[Int] = {
-      if (!s.isMethod) None
-      else {
-        val m = s.asMethod
-        if (getPolyType(m).isDefined) None
-        else {
-          val retTyp = m.returnType
-          val selfPars = m.paramLists.flatten.zipWithIndex.filter { case (parSym, idx) => parSym.info =:= retTyp }
-          selfPars match {
-            case Nil       => None
-            case hd :: Nil => Some(hd._2)
-            case _         => context.abort(m.pos, s"Invalid module method, return type is the type of more than a parameter")
-          }
-        }
-      }
-    }
-  }
+  def decoratorArgIndex(m:MethodSymbol):Option[Int] = { 
+      val retTyp = m.returnType
+      val selfPars = m.paramLists.flatten.zipWithIndex.filter { case (parSym, idx) => parSym.info =:= retTyp }
+      selfPars match {
+        case Nil       => None
+        case hd :: Nil => Some(hd._2)
+        case _         => context.abort(m.pos, s"Invalid module method, return type is the type of more than a parameter")
+      }  }
+
+  private def typeVariables(tv:Type):Set[TypeSymbol] = tv match {
+    case tr @ TypeRef(NoPrefix, typVar, typArgs) => Set(tr.typeSymbol.asType) ++ typArgs.toSet.flatMap( (t:Type) => typeVariables(t))
+    case TypeRef(_, base, typArgs) => typArgs.toSet.flatMap( (t:Type) => typeVariables(t))
+    case _ => Set.empty
+  } 
 
   def getBindings[T](t: context.universe.Type): Seq[Binding] = {
 
@@ -72,14 +68,19 @@ private[di] class MembersSelect[C <: Context](val context: C) {
         else baseSkipMethods
 
       t.members.filter(t => !(t.isTerm) || !skipMethods.contains(t.name.toTermName.decodedName.toString)).collect {
-        case m @ DecoratorSelfExtract(selfIndex) =>
-          val mthd = m.asMethod
-          DecoratorBinding(mthd, selfIndex)
+        
         case m if isBindingMethod(m) =>
           val mthd = m.asMethod
-          getPolyType(mthd).map(PolyMethodBinding(mthd, _)).getOrElse {
+  
+          if (!mthd.typeParams.map(_.asType).toSet.subsetOf(typeVariables(mthd.returnType) )) {
+            context.error(mthd.pos, "return type does not contains all type parameters")
+          }
+          
+          val decoratedArgIndex = decoratorArgIndex(mthd)
+          
+          getPolyType(mthd).map( pt => decoratedArgIndex.map( idx => PolyDecoratorBinding(mthd, pt, idx) ).getOrElse( PolyMethodBinding(mthd, pt) )).getOrElse {
             if (isValueMember(mthd) && isModuleContainerInstance(mthd.returnType)) ModuleContainerBinding(mthd, mthd.returnType)
-            else MethodBinding(mthd)
+            else decoratedArgIndex.map( idx => DecoratorBinding(mthd, idx) ).getOrElse( MethodBinding(mthd) )
           }
         case m if isPublicMethod(m) && m.asMethod.isGetter && isBindInstance(m) =>
           val bindTyp = m.asMethod.returnType
@@ -90,10 +91,12 @@ private[di] class MembersSelect[C <: Context](val context: C) {
         case m if m.isType && !m.isAbstract && getPrimaryConstructor(m.asType.toType).isDefined =>
           val mthd = getPrimaryConstructor(m.asType.toType).get
           getPolyType(mthd).map(PolyMethodBinding(mthd, _)).getOrElse(MethodBinding(mthd))
+          
         case x if x.isModule =>
           val typ = x.asModule.moduleClass.asType.toType
           if (isModuleContainerInstance(typ)) ModuleContainerBinding(x, typ)
           else ObjectBinding(x.asModule)
+          
       }.toSeq
     }
   }
@@ -127,6 +130,7 @@ private[di] class MembersSelect[C <: Context](val context: C) {
   case class DecoratorBinding(method: MethodSymbol, selfIndex: Int) extends Binding
   case class ModuleContainerBinding(method: Symbol, typ: Type) extends Binding
   case class PolyMethodBinding(method: MethodSymbol, methodType: PolyType) extends Binding
+  case class PolyDecoratorBinding(method: MethodSymbol, methodType: PolyType, selfIndex: Int) extends Binding
   case class ObjectBinding(module: ModuleSymbol) extends Binding
   case class BindInstance(method: MethodSymbol, abstractType: Type, concreteType: Type) extends Binding
 

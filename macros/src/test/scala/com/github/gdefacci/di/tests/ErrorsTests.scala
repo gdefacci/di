@@ -24,7 +24,13 @@ class ErrorsTests extends  FunSuite with Matchers {
   test("class cycles detection") {
     import samples3._
     
-    "com.github.gdefacci.di.IOC.getSource[ClR](1)" shouldNot compile
-    "com.github.gdefacci.di.IOC.getSource[ClR](1, ModCyc)" shouldNot compile
+    "com.github.gdefacci.di.IOC.get[ClR](1)" shouldNot compile
+    "com.github.gdefacci.di.IOC.get[ClR](1, ModCyc)" shouldNot compile
+  }
+  
+  test("return type does not contains all type parameters") {
+    
+    "com.github.gdefacci.di.IOC.get[Map[String,String]](samples3.InvalidPolimorphicMethod)" shouldNot compile
+    
   }
 }

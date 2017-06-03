@@ -2,7 +2,7 @@ package com.github.gdefacci.di.macrodef
 
 import scala.reflect.macros.blackbox
 
-trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeOrRefFactory[C] =>
+trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with DagNodeOrRefFactory[C] with Unifier[C] with ProvidersMixin[C] =>
 
   import context.universe._
 
@@ -12,7 +12,7 @@ trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with Da
     val dag = alias(termName, module, typ, ApplicationScope, parent)
   }
   
-  def emptyProviders = ProvidersMap.empty[DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator]
+  def emptyProviders = ProvidersMap.empty[DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator, PolyDecorator]
   
   class ModuleDagNodeOrRef(membersSelect: MembersSelect[context.type]) {
 
@@ -26,6 +26,13 @@ trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with Da
         moduleContainerDagNodeOrRefProviders(moduleOrModuleContainerAlias)
       } else {
         moduleDagNodeOrRefProviders(moduleOrModuleContainerAlias)
+      }
+    }
+    
+    def skipIndex[T](i:Int, seq:Seq[T]):Seq[T] = {
+      seq.zipWithIndex flatMap {
+        case (x, idx) if (idx == i) => Nil
+        case (x, _) => List(x)
       }
     }
 
@@ -43,10 +50,7 @@ trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with Da
 
         case membersSelect.DecoratorBinding(member, selfIndex) =>
 
-          val inpDags = paramListsDags(member.paramLists).zipWithIndex flatMap {
-            case (x, idx) if (idx == selfIndex) => Nil
-            case (x, _) => List(x)
-          }
+          val inpDags =  skipIndex(selfIndex, paramListsDags(member.paramLists))
 
           val dec = Decorator(inpDags :+ exprDag, exprNm, member, selfIndex)
           val scope = scopeProvider(member)
@@ -81,6 +85,18 @@ trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with Da
 
           val knds = scopeProvider(member)
           acc.polyMembers += new PolyDagNodeFactory(knds, Some(exprNm -> exprDag), member, polyType)
+          
+       case membersSelect.PolyDecoratorBinding(member, polyType, selfIndex) =>
+
+          val inpDags =  skipIndex(selfIndex, paramListsDags(member.paramLists))
+
+          val dec = PolyDecorator(inpDags :+ exprDag, exprNm, new PolyDagNodeFactory(DefaultScope, Some(exprNm -> exprDag), member, polyType), selfIndex)
+          val scope = scopeProvider(member)
+
+          if (scope != DefaultScope) context.abort(member.pos, "decorators cant have scope annotation")
+
+          acc.polyDecoratorsBuffer += dec
+   
       }
 
       acc.members += exprDag
@@ -89,7 +105,7 @@ trait ModuleDagNodeOrRefMixin[C <: blackbox.Context] { self: DagNodes[C] with Da
     }
 
     private def moduleContainerDagNodeOrRefProviders(moduleContainerAlias: ExprAlias): Providers[DagNodeOrRef] = {
-      val mappings = ProvidersMap.empty[DagNodeOrRef, DagNodeDagFactory, Ref, Type, Decorator]
+      val mappings = emptyProviders
       membersSelect.getValues(moduleContainerAlias.typ).map { member =>
         val typ = if (member.isModule) member.asModule.moduleClass.asType.toType
         else if (member.isMethod) member.asMethod.returnType

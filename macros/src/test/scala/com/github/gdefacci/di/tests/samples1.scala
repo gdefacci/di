@@ -52,13 +52,21 @@ object samples1 {
   object ModPolymorphic {
 
     def toOption[T](t: T): Option[T] = Some(t)
-
+    
     def createPippo(b: Option[Boolean]): Pippo = b match {
       case None => Pippo("None", 0)
       case Some(false) => Pippo("Pippy", 27)
       case Some(true) => Pippo("Pippo", 12)
     }
 
+  }
+  
+  object ModPolymorphic1 {
+
+    def toStringMap[T](t: T): Map[String, List[T]] = Map("key" -> List(t))
+    
+    def myInt = 4
+    
   }
 
   object ModPolymorphic0 {

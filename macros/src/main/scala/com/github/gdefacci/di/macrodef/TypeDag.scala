@@ -4,7 +4,7 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 import scala.util.control.NonFatal
 
-private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with TypeResolverMixin[C] with DagToExpressionFactoryMixin[C] with DagNodeOrRefFactory[C] with DagToExpr[C] with ModuleDagNodeOrRefMixin[C] {
+private[di] class TypeDag[C <: Context](val context: C) extends DagNodes[C] with TypeResolverMixin[C] with DagToExpressionFactoryMixin[C] with DagNodeOrRefFactory[C] with DagToExpr[C] with ModuleDagNodeOrRefMixin[C] with Unifier[C] with ProvidersMixin[C] {
 
   import context.universe._
 

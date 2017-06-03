@@ -30,6 +30,7 @@ private[di] class ReflectUtils[C <: Context](val context: C) {
     }
   }
 
+
   def newAbstractClass(typ: Symbol, paramss: List[List[Symbol]], arguments: Seq[Tree], members: Seq[Tree]): Tree = {
     val typName = TypeName(context.freshName(typ.name.decodedName.toString))
     val pars = byLengthsPartition(paramss.map(_.length), arguments.toList)
@@ -60,5 +61,5 @@ private[di] class ReflectUtils[C <: Context](val context: C) {
         curr +: byLengthsPartition(rest, restArgs)
     }
   }  
-    
+  
 }
